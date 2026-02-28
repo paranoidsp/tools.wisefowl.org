@@ -10,6 +10,13 @@ body {
     background: #fafafa;
 }
 
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 2rem;
+}
+
 h1 {
     font-size: 1.8rem;
     margin-bottom: 0.25rem;
@@ -17,7 +24,7 @@ h1 {
 
 .subtitle {
     color: #666;
-    margin-bottom: 2rem;
+    margin-bottom: 0;
 }
 
 h2 {
@@ -51,12 +58,13 @@ a:hover {
 
 .private-link {
     display: inline-block;
-    margin-top: 0.5rem;
-    padding: 0.4rem 0.8rem;
+    margin-top: 0.25rem;
+    padding: 0.3rem 0.7rem;
     border: 1px solid #e5e7eb;
     border-radius: 4px;
     color: #666;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
 }
 .private-link:hover {
     border-color: #2563eb;
