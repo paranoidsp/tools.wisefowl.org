@@ -1,0 +1,91 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    color: #1a1a1a;
+    background: #fafafa;
+}
+
+h1 {
+    font-size: 1.8rem;
+    margin-bottom: 0.25rem;
+}
+
+.subtitle {
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+h2 {
+    font-size: 1.2rem;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+ul {
+    list-style: none;
+    padding: 0;
+}
+
+ul li {
+    padding: 0.4rem 0;
+}
+
+a {
+    color: #2563eb;
+    text-decoration: none;
+}
+a:hover {
+    text-decoration: underline;
+}
+
+.tool-desc {
+    color: #666;
+}
+
+.private-link {
+    display: inline-block;
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    color: #666;
+    font-size: 0.9rem;
+}
+.private-link:hover {
+    border-color: #2563eb;
+    color: #2563eb;
+    text-decoration: none;
+}
+
+.empty-state {
+    color: #999;
+    font-style: italic;
+    padding: 1rem 0;
+}
+
+footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+    color: #999;
+    font-size: 0.85rem;
+}
+
+footer a {
+    color: #999;
+}
+footer a:hover {
+    color: #2563eb;
+}
+
+@media (max-width: 600px) {
+    body { padding: 1rem 0.75rem; }
+    h1 { font-size: 1.5rem; }
+}
