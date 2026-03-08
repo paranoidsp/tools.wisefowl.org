@@ -1,4 +1,11 @@
-# tools.wisefowl.org
+---
+created: '2026-03-04 16:34:30'
+updated: '2026-03-04 16:34:30'
+creators:
+- human-legacy
+type: note
+status: draft
+---# tools.wisefowl.org
 
 A collection of browser-based tools and experiments, hosted at [tools.wisefowl.org](https://tools.wisefowl.org).
 
