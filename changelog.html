@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Changelog — Wisefowl Tools</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .commit {
+            display: flex;
+            gap: 1rem;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 0.9rem;
+            align-items: baseline;
+        }
+        .commit-date {
+            color: #9ca3af;
+            white-space: nowrap;
+            font-size: 0.8rem;
+            min-width: 6rem;
+        }
+        .commit-msg {
+            flex: 1;
+            color: #1a1a1a;
+        }
+        .commit-hash {
+            color: #9ca3af;
+            font-family: monospace;
+            font-size: 0.78rem;
+            white-space: nowrap;
+        }
+        .commit-hash a { color: inherit; }
+        .commit-hash a:hover { color: #2563eb; }
+        #status { color: #9ca3af; font-size: 0.9rem; padding: 1rem 0; }
+        #error { color: #dc2626; font-size: 0.9rem; padding: 1rem 0; }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>Changelog</h1>
+            <p class="subtitle">All commits to this site.</p>
+        </div>
+        <a class="private-link" href="/">← Tools</a>
+    </header>
+
+    <div id="status">Loading…</div>
+    <div id="error" hidden></div>
+    <div id="commits"></div>
+
+    <footer>
+        <a href="/">tools</a> &middot;
+        <a href="https://en.wikipedia.org/wiki/Existentialism">wisefowl.org</a>
+    </footer>
+
+    <script>
+        const REPO = 'paranoidsp/tools.wisefowl.org';
+        const status = document.getElementById('status');
+        const errorEl = document.getElementById('error');
+        const commitsEl = document.getElementById('commits');
+
+        async function load(page = 1, accumulated = []) {
+            const res = await fetch(
+                `https://api.github.com/repos/${REPO}/commits?per_page=100&page=${page}`,
+                { headers: { Accept: 'application/vnd.github.v3+json' } }
+            );
+            if (!res.ok) throw new Error(`GitHub API ${res.status}: ${res.statusText}`);
+            const data = await res.json();
+            const all = accumulated.concat(data);
+            const link = res.headers.get('Link') || '';
+            if (data.length === 100 && link.includes('rel="next"')) {
+                return load(page + 1, all);
+            }
+            return all;
+        }
+
+        function formatDate(iso) {
+            const d = new Date(iso);
+            return d.toISOString().slice(0, 10);
+        }
+
+        function renderCommits(commits) {
+            commitsEl.innerHTML = commits.map(c => {
+                const msg = c.commit.message.split('\n')[0];
+                const hash = c.sha.slice(0, 7);
+                const url = c.html_url;
+                const date = formatDate(c.commit.committer.date);
+                return `<div class="commit">
+                    <span class="commit-date">${date}</span>
+                    <span class="commit-msg">${escHtml(msg)}</span>
+                    <span class="commit-hash"><a href="${url}" target="_blank" rel="noopener">${hash}</a></span>
+                </div>`;
+            }).join('');
+        }
+
+        function escHtml(s) {
+            return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        load()
+            .then(commits => {
+                status.hidden = true;
+                renderCommits(commits);
+            })
+            .catch(err => {
+                status.hidden = true;
+                errorEl.hidden = false;
+                errorEl.textContent = `Failed to load commits: ${err.message}`;
+            });
+    </script>
+</body>
+</html>
