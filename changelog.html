@@ -32,6 +32,15 @@
         }
         .commit-hash a { color: inherit; }
         .commit-hash a:hover { color: #2563eb; }
+        .commit-tool {
+            font-size: 0.75rem;
+            background: #eff6ff;
+            color: #2563eb;
+            border: 1px solid #bfdbfe;
+            border-radius: 3px;
+            padding: 0.05rem 0.35rem;
+            white-space: nowrap;
+        }
         #status { color: #9ca3af; font-size: 0.9rem; padding: 1rem 0; }
         #error { color: #dc2626; font-size: 0.9rem; padding: 1rem 0; }
     </style>
@@ -80,14 +89,26 @@
             return d.toISOString().slice(0, 10);
         }
 
+        // Parse conventional commit: "type(scope): message" → { type, scope, msg }
+        function parseCommit(raw) {
+            const m = raw.match(/^[a-z]+\(([^)]+)\):\s*(.+)$/);
+            if (m) return { scope: m[1], msg: m[2] };
+            // strip bare type prefix "feat: " etc.
+            const m2 = raw.match(/^[a-z]+:\s*(.+)$/);
+            return { scope: null, msg: m2 ? m2[1] : raw };
+        }
+
         function renderCommits(commits) {
             commitsEl.innerHTML = commits.map(c => {
-                const msg = c.commit.message.split('\n')[0];
+                const raw = c.commit.message.split('\n')[0];
+                const { scope, msg } = parseCommit(raw);
                 const hash = c.sha.slice(0, 7);
                 const url = c.html_url;
                 const date = formatDate(c.commit.committer.date);
+                const badge = scope ? `<span class="commit-tool">${escHtml(scope)}</span>` : '';
                 return `<div class="commit">
                     <span class="commit-date">${date}</span>
+                    ${badge}
                     <span class="commit-msg">${escHtml(msg)}</span>
                     <span class="commit-hash"><a href="${url}" target="_blank" rel="noopener">${hash}</a></span>
                 </div>`;

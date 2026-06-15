@@ -22,12 +22,23 @@ Inspired by [Simon Willison's tools](https://tools.simonwillison.net) — a wond
 
 1. Create `tool-name.html` in the root (or `private/tool-name.html` for auth-gated tools)
 2. Link `style.css` for shared styles, or use inline styles
-3. Add an entry to `index.html` (or `private/index.html`):
+3. Add an entry to `index.html`:
    ```html
    <li><a href="tool-name.html">Tool Name</a> <span class="tool-desc">— What it does.</span></li>
    ```
 4. Commit and push — Cloudflare Pages will auto-deploy
-5. Optionally add a development history entry to `history.html`
+
+## Commit convention
+
+One tool per commit. Use conventional commits with the tool name as scope:
+
+```
+feat(pdf-compressor): add separate PDFs mode
+fix(pdf-compressor): correct filename encoding for unicode
+chore(site): update index page links
+```
+
+The changelog page parses the scope and shows it as a tool badge.
 
 ## Deploy
 
