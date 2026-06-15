@@ -40,3 +40,20 @@ Inspired by [Simon Willison's tools](https://tools.simonwillison.net) — a wond
 
 - `tools.wisefowl.org/*` — public
 - `tools.wisefowl.org/private/*` — Cloudflare Zero Trust, restricted to `@wisefowl.org`
+
+## Known Issues
+
+### `.pages.dev` URLs bypass Access
+
+CF Pages assigns a public `*.tools-wisefowl-org.pages.dev` URL to every deployment and a permanent `tools-wisefowl-org.pages.dev` alias. These bypass Cloudflare Access entirely — including `/private/`.
+
+**Root cause:** Adding a CF Access app for `*.tools-wisefowl-org.pages.dev` causes CF to also block `tools.wisefowl.org` (the custom domain), because CF links all hostnames for a Pages project when evaluating Access policies.
+
+**Impact:**
+- Anyone who knows a `*.pages.dev` URL can access `/private/` without auth
+- Per-deployment URLs (e.g. `3ebc20cb.tools-wisefowl-org.pages.dev`) always mirror production content
+
+**Workaround pending:** No clean CF-native solution found as of 2026-06-15. Options being evaluated:
+- CF Workers on `pages.dev` zone (not on our zone, so likely not possible)
+- Moving `/private/` to a separate subdomain (e.g. `private.tools.wisefowl.org`) that has no `.pages.dev` alias
+- Accepting the risk given `/private/` content is low-sensitivity experiments
