@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Compressor — Wisefowl Tools</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        #drop-zone {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            margin: 1.5rem 0;
+            color: #6b7280;
+        }
+        #drop-zone.drag-over {
+            border-color: #2563eb;
+            background: #eff6ff;
+        }
+        #drop-zone p { margin: 0.25rem 0; }
+        #drop-zone .hint { font-size: 0.9rem; }
+        #browse-btn {
+            background: none;
+            border: none;
+            color: #2563eb;
+            cursor: pointer;
+            font-size: inherit;
+            padding: 0;
+            text-decoration: underline;
+        }
+        #queue-list { list-style: none; padding: 0; margin: 0.5rem 0 1rem; }
+        #queue-list li {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 0.9rem;
+        }
+        #queue-list li .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #queue-list li .meta { color: #9ca3af; font-size: 0.8rem; white-space: nowrap; }
+        #queue-list li .err { color: #dc2626; font-size: 0.8rem; }
+        .queue-btn {
+            background: none;
+            border: 1px solid #e5e7eb;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 0.1rem 0.35rem;
+            color: #6b7280;
+        }
+        .queue-btn:hover { border-color: #9ca3af; color: #1a1a1a; }
+        .queue-btn.remove:hover { border-color: #fca5a5; color: #dc2626; }
+        .queue-btn:disabled { opacity: 0.3; cursor: default; }
+        .quality-selector { display: flex; gap: 0.5rem; margin: 0.5rem 0 0.75rem; }
+        .quality-btn {
+            flex: 1;
+            padding: 0.4rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #6b7280;
+        }
+        .quality-btn.active {
+            border-color: #2563eb;
+            color: #2563eb;
+            background: #eff6ff;
+        }
+        .limitation-notice {
+            font-size: 0.82rem;
+            color: #9ca3af;
+            margin: 0.5rem 0 1.5rem;
+        }
+        #memory-warning {
+            font-size: 0.82rem;
+            color: #92400e;
+            background: #fef3c7;
+            border: 1px solid #fde68a;
+            border-radius: 4px;
+            padding: 0.4rem 0.75rem;
+            margin-top: 0.75rem;
+        }
+        #create-btn {
+            padding: 0.6rem 1.5rem;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        #create-btn:hover { background: #1d4ed8; }
+        #create-btn:disabled { background: #93c5fd; cursor: not-allowed; }
+        #output-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.75rem 0;
+        }
+        #size-comparison { color: #16a34a; font-size: 0.9rem; }
+        #status-msg { color: #6b7280; font-size: 0.9rem; margin-top: 0.5rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>PDF Compressor</h1>
+            <p class="subtitle">Merge images and PDFs into one small PDF. Files never leave your device.</p>
+        </div>
+        <a class="private-link" href="/">← Tools</a>
+    </header>
+
+    <div id="drop-zone">
+        <p>Drop images or PDFs here</p>
+        <p class="hint">or <button id="browse-btn" type="button">browse files</button></p>
+        <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple hidden>
+    </div>
+
+    <section id="queue-section" hidden>
+        <h2>Files <span id="page-count-summary" style="color:#9ca3af;font-weight:normal;font-size:0.9rem;"></span></h2>
+        <ul id="queue-list"></ul>
+
+        <div class="quality-selector">
+            <button class="quality-btn" data-level="low" type="button">Low</button>
+            <button class="quality-btn active" data-level="medium" type="button">Medium</button>
+            <button class="quality-btn" data-level="high" type="button">High</button>
+        </div>
+        <p class="limitation-notice">Text in PDFs will not be selectable in the output. Use High quality for text documents.</p>
+
+        <button id="create-btn" type="button">Create PDF</button>
+        <div id="memory-warning" hidden>Large document (&gt;40 pages) — may be slow on mobile.</div>
+        <div id="status-msg" hidden></div>
+    </section>
+
+    <section id="output-section" hidden>
+        <h2>Output</h2>
+        <div id="output-row">
+            <a id="download-link" href="#">Download PDF</a>
+            <span id="size-comparison"></span>
+        </div>
+    </section>
+
+    <footer>
+        <a href="history.html">history</a> &middot;
+        <a href="https://en.wikipedia.org/wiki/Existentialism">wisefowl.org</a>
+    </footer>
+
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script type="module">
+        import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.min.mjs';
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+            'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.worker.min.mjs';
+
+        const QUALITY = {
+            low:    { jpeg: 0.60, imgMaxDim: 1200, pdfScale: 1.5 },
+            medium: { jpeg: 0.75, imgMaxDim: 1800, pdfScale: 2.0 },
+            high:   { jpeg: 0.90, imgMaxDim: 2400, pdfScale: 3.0 },
+        };
+
+        const ACCEPTED = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
+
+        let queue = [];
+        let nextId = 0;
+        let activeLevel = 'medium';
+        let outputUrl = null;
+
+        const dropZone      = document.getElementById('drop-zone');
+        const fileInput     = document.getElementById('file-input');
+        const browseBtn     = document.getElementById('browse-btn');
+        const queueSection  = document.getElementById('queue-section');
+        const queueList     = document.getElementById('queue-list');
+        const pageCountSum  = document.getElementById('page-count-summary');
+        const memWarn       = document.getElementById('memory-warning');
+        const createBtn     = document.getElementById('create-btn');
+        const statusMsg     = document.getElementById('status-msg');
+        const outputSection = document.getElementById('output-section');
+        const downloadLink  = document.getElementById('download-link');
+        const sizeComp      = document.getElementById('size-comparison');
+
+        // Drop zone
+        dropZone.addEventListener('click', () => fileInput.click());
+        browseBtn.addEventListener('click', e => { e.stopPropagation(); fileInput.click(); });
+        dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', ()  => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            addFiles([...e.dataTransfer.files]);
+        });
+        fileInput.addEventListener('change', () => {
+            addFiles([...fileInput.files]);
+            fileInput.value = '';
+        });
+
+        async function addFiles(files) {
+            for (const file of files) {
+                if (!ACCEPTED.has(file.type)) continue;
+                const item = {
+                    id: nextId++,
+                    file,
+                    type: file.type === 'application/pdf' ? 'pdf' : 'image',
+                    name: file.name,
+                    pageCount: null,
+                    error: null,
+                };
+                queue.push(item);
+                renderQueue();
+                if (item.type === 'pdf') {
+                    try {
+                        const buf = await file.arrayBuffer();
+                        const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+                        item.pageCount = doc.numPages;
+                        doc.destroy();
+                    } catch {
+                        item.error = 'Failed to read PDF';
+                    }
+                    renderQueue();
+                }
+            }
+        }
+
+        function moveItem(id, dir) {
+            const i = queue.findIndex(x => x.id === id);
+            const j = i + dir;
+            if (j < 0 || j >= queue.length) return;
+            [queue[i], queue[j]] = [queue[j], queue[i]];
+            renderQueue();
+        }
+
+        function removeItem(id) {
+            queue = queue.filter(x => x.id !== id);
+            renderQueue();
+        }
+
+        function totalPages() {
+            return queue.reduce((n, x) => n + (x.pageCount ?? (x.type === 'image' ? 1 : 0)), 0);
+        }
+
+        function renderQueue() {
+            queueSection.hidden = queue.length === 0;
+            outputSection.hidden = true;
+            if (outputUrl) { URL.revokeObjectURL(outputUrl); outputUrl = null; }
+
+            const pages = totalPages();
+            pageCountSum.textContent = `(${queue.length} file${queue.length !== 1 ? 's' : ''}, ~${pages} page${pages !== 1 ? 's' : ''})`;
+            memWarn.hidden = pages <= 40;
+
+            queueList.innerHTML = '';
+            queue.forEach((item, i) => {
+                const li = document.createElement('li');
+                const icon = item.type === 'pdf' ? '📄' : '🖼';
+                const meta = item.error
+                    ? `<span class="err">${item.error}</span>`
+                    : item.type === 'pdf'
+                        ? `<span class="meta">${item.pageCount != null ? item.pageCount + ' page' + (item.pageCount !== 1 ? 's' : '') : 'loading…'}</span>`
+                        : `<span class="meta">image</span>`;
+                li.innerHTML = `
+                    <span>${icon}</span>
+                    <span class="name" title="${item.name}">${item.name}</span>
+                    ${meta}
+                    <button class="queue-btn" data-action="up" data-id="${item.id}" ${i === 0 ? 'disabled' : ''}>↑</button>
+                    <button class="queue-btn" data-action="down" data-id="${item.id}" ${i === queue.length - 1 ? 'disabled' : ''}>↓</button>
+                    <button class="queue-btn remove" data-action="remove" data-id="${item.id}">✕</button>
+                `;
+                queueList.appendChild(li);
+            });
+        }
+
+        queueList.addEventListener('click', e => {
+            const btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            const id = +btn.dataset.id;
+            if (btn.dataset.action === 'up')     moveItem(id, -1);
+            if (btn.dataset.action === 'down')   moveItem(id, +1);
+            if (btn.dataset.action === 'remove') removeItem(id);
+        });
+
+        // Quality selector
+        document.querySelector('.quality-selector').addEventListener('click', e => {
+            const btn = e.target.closest('.quality-btn');
+            if (!btn) return;
+            document.querySelectorAll('.quality-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            activeLevel = btn.dataset.level;
+        });
+
+        // Processing
+        async function imageToJpeg(file, maxDim, jpegQ) {
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+            URL.revokeObjectURL(url);
+            let w = img.naturalWidth, h = img.naturalHeight;
+            if (Math.max(w, h) > maxDim) {
+                const r = maxDim / Math.max(w, h);
+                w = Math.round(w * r);
+                h = Math.round(h * r);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            const dataUrl = canvas.toDataURL('image/jpeg', jpegQ);
+            const base64 = dataUrl.split(',')[1];
+            return { bytes: Uint8Array.from(atob(base64), c => c.charCodeAt(0)), w, h };
+        }
+
+        async function pdfPageToJpeg(pdfPage, scale, jpegQ) {
+            const vp = pdfPage.getViewport({ scale });
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(vp.width);
+            canvas.height = Math.round(vp.height);
+            await pdfPage.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+            const dataUrl = canvas.toDataURL('image/jpeg', jpegQ);
+            const base64 = dataUrl.split(',')[1];
+            return { bytes: Uint8Array.from(atob(base64), c => c.charCodeAt(0)), w: canvas.width, h: canvas.height };
+        }
+
+        createBtn.addEventListener('click', async () => {
+            if (queue.length === 0) return;
+            const cfg = QUALITY[activeLevel];
+            const totalInputBytes = queue.reduce((n, x) => n + x.file.size, 0);
+
+            createBtn.disabled = true;
+            statusMsg.hidden = false;
+            statusMsg.textContent = 'Starting…';
+            outputSection.hidden = true;
+
+            const { PDFDocument } = window.PDFLib;
+            const doc = await PDFDocument.create();
+            let processed = 0;
+
+            try {
+                for (const item of queue) {
+                    if (item.error) continue;
+                    processed++;
+                    statusMsg.textContent = `Processing ${item.name}… (${processed}/${queue.filter(x => !x.error).length})`;
+
+                    if (item.type === 'image') {
+                        const { bytes, w, h } = await imageToJpeg(item.file, cfg.imgMaxDim, cfg.jpeg);
+                        const img = await doc.embedJpg(bytes);
+                        const page = doc.addPage([w, h]);
+                        page.drawImage(img, { x: 0, y: 0, width: w, height: h });
+                    } else {
+                        const buf = await item.file.arrayBuffer();
+                        const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+                        for (let p = 1; p <= pdfDoc.numPages; p++) {
+                            const pdfPage = await pdfDoc.getPage(p);
+                            const { bytes, w, h } = await pdfPageToJpeg(pdfPage, cfg.pdfScale, cfg.jpeg);
+                            const img = await doc.embedJpg(bytes);
+                            const page = doc.addPage([w, h]);
+                            page.drawImage(img, { x: 0, y: 0, width: w, height: h });
+                        }
+                        pdfDoc.destroy();
+                    }
+                }
+
+                statusMsg.textContent = 'Saving…';
+                const pdfBytes = await doc.save();
+
+                if (outputUrl) URL.revokeObjectURL(outputUrl);
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                outputUrl = URL.createObjectURL(blob);
+
+                const date = new Date().toISOString().slice(0, 10);
+                downloadLink.href = outputUrl;
+                downloadLink.download = `compressed-${date}.pdf`;
+                downloadLink.textContent = `Download compressed-${date}.pdf`;
+
+                const inMB  = (totalInputBytes / 1048576).toFixed(1);
+                const outMB = (pdfBytes.byteLength / 1048576).toFixed(1);
+                const pct   = Math.round((1 - pdfBytes.byteLength / totalInputBytes) * 100);
+                sizeComp.textContent = pct > 0
+                    ? `${inMB} MB → ${outMB} MB (${pct}% smaller)`
+                    : `${inMB} MB → ${outMB} MB`;
+
+                outputSection.hidden = false;
+                statusMsg.hidden = true;
+            } catch (err) {
+                statusMsg.textContent = `Error: ${err.message}`;
+            } finally {
+                createBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
