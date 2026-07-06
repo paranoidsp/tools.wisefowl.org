@@ -137,7 +137,7 @@
     <header>
         <div>
             <h1>Media Clipper</h1>
-            <p class="subtitle">Trim a clip from an audio or video file and export it as video, audio, or GIF. Files never leave your device.</p>
+            <p class="subtitle">Trim a clip from an audio or video file. Export video as MP4 or GIF, or audio as MP3, M4A, or WAV. Files never leave your device.</p>
         </div>
         <a class="private-link" href="/">← Tools</a>
     </header>
@@ -230,10 +230,10 @@
             mp4:  { label: 'MP4',        ext: 'mp4', mime: 'video/mp4',  kind: 'video' },
             gif:  { label: 'GIF',        ext: 'gif', mime: 'image/gif',  kind: 'gif' },
             mp3:  { label: 'MP3 (audio)', ext: 'mp3', mime: 'audio/mpeg', kind: 'audio' },
-            m4a:  { label: 'M4A',        ext: 'm4a', mime: 'audio/mp4',  kind: 'audio' },
+            m4a:  { label: 'M4A (audio)', ext: 'm4a', mime: 'audio/mp4',  kind: 'audio' },
             wav:  { label: 'WAV',        ext: 'wav', mime: 'audio/wav',  kind: 'audio' },
         };
-        const VIDEO_FORMATS = ['mp4', 'gif', 'mp3'];
+        const VIDEO_FORMATS = ['mp4', 'gif', 'mp3', 'm4a'];
         const AUDIO_FORMATS = ['mp3', 'm4a', 'wav'];
 
         // ---- State --------------------------------------------------------------
