@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Clipper — Wisefowl Tools</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        #drop-zone {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            margin: 1.5rem 0;
+            color: #6b7280;
+        }
+        #drop-zone.drag-over { border-color: #2563eb; background: #eff6ff; }
+        #drop-zone p { margin: 0.25rem 0; }
+        #drop-zone .hint { font-size: 0.9rem; }
+        #browse-btn {
+            background: none; border: none; color: #2563eb; cursor: pointer;
+            font-size: inherit; padding: 0; text-decoration: underline;
+        }
+
+        #preview {
+            width: 100%;
+            max-height: 55vh;
+            background: #1a1a1a;
+            border-radius: 6px;
+            display: block;
+        }
+        #preview.audio-mode {
+            max-height: none;
+            height: 3rem;
+            background: #eff6ff;
+        }
+        #file-name {
+            font-size: 0.85rem; color: #6b7280;
+            margin: 0.5rem 0 0; overflow: hidden;
+            text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        /* Timeline / selection bar */
+        .timeline {
+            position: relative;
+            height: 3rem;
+            margin: 1rem 0 0.25rem;
+            background: #f3f4f6;
+            border-radius: 5px;
+            cursor: pointer;
+            touch-action: none;
+            user-select: none;
+        }
+        .tl-selection {
+            position: absolute;
+            top: 0; bottom: 0;
+            background: #eff6ff;
+            border-left: 2px solid #2563eb;
+            border-right: 2px solid #2563eb;
+        }
+        .tl-handle {
+            position: absolute;
+            top: -0.25rem; bottom: -0.25rem;
+            width: 12px;
+            margin-left: -6px;
+            background: #2563eb;
+            border-radius: 3px;
+            cursor: ew-resize;
+        }
+        .tl-handle::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 2px; height: 40%;
+            margin: -0.6rem 0 0 -1px;
+            background: rgba(255,255,255,0.7);
+            border-radius: 1px;
+            box-shadow: 3px 0 rgba(255,255,255,0.7), -3px 0 rgba(255,255,255,0.7);
+        }
+        .tl-playhead {
+            position: absolute;
+            top: -0.25rem; bottom: -0.25rem;
+            width: 2px;
+            margin-left: -1px;
+            background: #dc2626;
+            pointer-events: none;
+        }
+        .tl-times {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #9ca3af;
+            font-variant-numeric: tabular-nums;
+        }
+        .tl-times .sel { color: #2563eb; }
+
+        .set-row { display: flex; gap: 0.5rem; margin: 0.75rem 0 0.25rem; flex-wrap: wrap; }
+        .ghost-btn {
+            border: 1px solid #e5e7eb; border-radius: 4px; background: white;
+            cursor: pointer; font-size: 0.85rem; padding: 0.3rem 0.7rem; color: #6b7280;
+        }
+        .ghost-btn:hover { border-color: #2563eb; color: #2563eb; }
+
+        .field-label { font-size: 0.85rem; color: #6b7280; margin: 1rem 0 0.4rem; }
+        .selector { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .opt-btn {
+            flex: 1; min-width: 4rem; padding: 0.4rem;
+            border: 1px solid #e5e7eb; border-radius: 4px; background: white;
+            cursor: pointer; font-size: 0.9rem; color: #6b7280; white-space: nowrap;
+        }
+        .opt-btn.active { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+
+        #clip-btn {
+            margin-top: 1.25rem;
+            padding: 0.6rem 1.5rem;
+            background: #2563eb; color: white; border: none;
+            border-radius: 5px; font-size: 1rem; cursor: pointer;
+        }
+        #clip-btn:hover { background: #1d4ed8; }
+        #clip-btn:disabled { background: #93c5fd; cursor: not-allowed; }
+
+        #status-msg { color: #6b7280; font-size: 0.9rem; margin-top: 0.75rem; }
+        #size-warning {
+            font-size: 0.82rem; color: #92400e; background: #fef3c7;
+            border: 1px solid #fde68a; border-radius: 4px;
+            padding: 0.4rem 0.75rem; margin-top: 0.75rem;
+        }
+        .note { font-size: 0.82rem; color: #9ca3af; margin: 0.5rem 0 0; }
+
+        #output-row { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0; flex-wrap: wrap; }
+        #output-size { color: #16a34a; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>Media Clipper</h1>
+            <p class="subtitle">Trim a clip from an audio or video file and export it as video, audio, or GIF. Files never leave your device.</p>
+        </div>
+        <a class="private-link" href="/">← Tools</a>
+    </header>
+
+    <div id="drop-zone">
+        <p>Drop an audio or video file here</p>
+        <p class="hint">or <button id="browse-btn" type="button">browse files</button></p>
+        <input type="file" id="file-input" accept="audio/*,video/*" hidden>
+    </div>
+
+    <section id="editor" hidden>
+        <video id="preview" controls playsinline></video>
+        <p id="file-name"></p>
+
+        <div class="timeline" id="timeline">
+            <div class="tl-selection" id="tl-selection"></div>
+            <div class="tl-playhead" id="tl-playhead"></div>
+            <div class="tl-handle" id="tl-start"></div>
+            <div class="tl-handle" id="tl-end"></div>
+        </div>
+        <div class="tl-times">
+            <span id="t-start" class="sel">0:00.0</span>
+            <span id="t-current">0:00.0</span>
+            <span id="t-end" class="sel">0:00.0</span>
+        </div>
+
+        <div class="set-row">
+            <button class="ghost-btn" id="play-sel" type="button">▶ Play selection</button>
+            <button class="ghost-btn" id="set-start" type="button">[ Set start to playhead</button>
+            <button class="ghost-btn" id="set-end" type="button">Set end to playhead ]</button>
+        </div>
+
+        <p class="field-label">Format</p>
+        <div class="selector" id="format-selector"></div>
+
+        <div id="res-field" hidden>
+            <p class="field-label">Size</p>
+            <div class="selector" id="res-selector">
+                <button class="opt-btn" data-h="0" type="button">Original</button>
+                <button class="opt-btn" data-h="720" type="button">720p</button>
+                <button class="opt-btn active" data-h="480" type="button">480p</button>
+                <button class="opt-btn" data-h="360" type="button">360p</button>
+            </div>
+        </div>
+
+        <div id="fps-field" hidden>
+            <p class="field-label">Frame rate</p>
+            <div class="selector" id="fps-selector">
+                <button class="opt-btn" data-fps="10" type="button">10 fps</button>
+                <button class="opt-btn active" data-fps="15" type="button">15 fps</button>
+                <button class="opt-btn" data-fps="24" type="button">24 fps</button>
+            </div>
+        </div>
+
+        <div id="bitrate-field" hidden>
+            <p class="field-label">Quality</p>
+            <div class="selector" id="bitrate-selector">
+                <button class="opt-btn" data-br="96k" type="button">Low</button>
+                <button class="opt-btn active" data-br="160k" type="button">Medium</button>
+                <button class="opt-btn" data-br="256k" type="button">High</button>
+            </div>
+        </div>
+
+        <button id="clip-btn" type="button">Clip</button>
+        <div id="size-warning" hidden></div>
+        <div id="status-msg" hidden></div>
+        <p class="note">First clip loads the video engine (~32&nbsp;MB) — later clips are instant. Everything runs locally in your browser.</p>
+    </section>
+
+    <section id="output-section" hidden>
+        <h2>Output</h2>
+        <div id="output-row">
+            <a id="download-link" href="#">Download</a>
+            <span id="output-size"></span>
+        </div>
+        <video id="output-preview" controls playsinline style="width:100%;max-height:45vh;background:#1a1a1a;border-radius:6px;margin-top:0.5rem;" hidden></video>
+        <img id="output-gif" alt="clip preview" style="max-width:100%;border-radius:6px;margin-top:0.5rem;" hidden>
+    </section>
+
+    <footer>
+        <a href="/changelog.html">changelog</a> &middot;
+        <a href="https://en.wikipedia.org/wiki/Existentialism">wisefowl.org</a>
+    </footer>
+
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+    <script>
+        // ---- Format definitions -------------------------------------------------
+        const FORMATS = {
+            mp4:  { label: 'MP4',        ext: 'mp4', mime: 'video/mp4',  kind: 'video' },
+            gif:  { label: 'GIF',        ext: 'gif', mime: 'image/gif',  kind: 'gif' },
+            mp3:  { label: 'MP3 (audio)', ext: 'mp3', mime: 'audio/mpeg', kind: 'audio' },
+            m4a:  { label: 'M4A',        ext: 'm4a', mime: 'audio/mp4',  kind: 'audio' },
+            wav:  { label: 'WAV',        ext: 'wav', mime: 'audio/wav',  kind: 'audio' },
+        };
+        const VIDEO_FORMATS = ['mp4', 'gif', 'mp3'];
+        const AUDIO_FORMATS = ['mp3', 'm4a', 'wav'];
+
+        // ---- State --------------------------------------------------------------
+        let mediaFile = null;
+        let mediaKind = 'video';          // 'video' | 'audio' — of the *input*
+        let duration = 0;
+        let selStart = 0, selEnd = 0;
+        let format = 'mp4';
+        let resHeight = 480;              // 0 = original
+        let gifFps = 15;
+        let bitrate = '160k';
+        let ffmpeg = null;                // lazy-loaded FFmpeg instance
+        let coreBlobs = null;             // cached blob URLs for the engine
+        let outputUrls = [];
+
+        const trackUrl = u => { outputUrls.push(u); return u; };
+        const revokeOutputs = () => { outputUrls.forEach(u => URL.revokeObjectURL(u)); outputUrls = []; };
+
+        // ---- Elements -----------------------------------------------------------
+        const dropZone   = document.getElementById('drop-zone');
+        const fileInput  = document.getElementById('file-input');
+        const browseBtn  = document.getElementById('browse-btn');
+        const editor     = document.getElementById('editor');
+        const preview    = document.getElementById('preview');
+        const fileNameEl = document.getElementById('file-name');
+        const timeline   = document.getElementById('timeline');
+        const tlSel      = document.getElementById('tl-selection');
+        const tlPlayhead = document.getElementById('tl-playhead');
+        const hStart     = document.getElementById('tl-start');
+        const hEnd       = document.getElementById('tl-end');
+        const tStartEl   = document.getElementById('t-start');
+        const tCurrentEl = document.getElementById('t-current');
+        const tEndEl     = document.getElementById('t-end');
+        const playSelBtn = document.getElementById('play-sel');
+        const setStartBtn = document.getElementById('set-start');
+        const setEndBtn  = document.getElementById('set-end');
+        const formatSel  = document.getElementById('format-selector');
+        const resField   = document.getElementById('res-field');
+        const fpsField   = document.getElementById('fps-field');
+        const bitrateField = document.getElementById('bitrate-field');
+        const clipBtn    = document.getElementById('clip-btn');
+        const sizeWarn   = document.getElementById('size-warning');
+        const statusMsg  = document.getElementById('status-msg');
+        const outputSection = document.getElementById('output-section');
+        const downloadLink  = document.getElementById('download-link');
+        const outputSizeEl  = document.getElementById('output-size');
+        const outputPreview = document.getElementById('output-preview');
+        const outputGif     = document.getElementById('output-gif');
+
+        // ---- Helpers ------------------------------------------------------------
+        function fmtTime(t) {
+            if (!isFinite(t)) t = 0;
+            const m = Math.floor(t / 60);
+            const s = Math.floor(t % 60);
+            const d = Math.floor((t * 10) % 10);
+            return `${m}:${String(s).padStart(2, '0')}.${d}`;
+        }
+        const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+        // ---- File input ---------------------------------------------------------
+        dropZone.addEventListener('click', () => fileInput.click());
+        browseBtn.addEventListener('click', e => { e.stopPropagation(); fileInput.click(); });
+        dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) loadFile(fileInput.files[0]);
+            fileInput.value = '';
+        });
+
+        function loadFile(file) {
+            if (!/^(audio|video)\//.test(file.type)) {
+                alert('Please choose an audio or video file.');
+                return;
+            }
+            mediaFile = file;
+            mediaKind = file.type.startsWith('audio/') ? 'audio' : 'video';
+
+            revokeOutputs();
+            outputSection.hidden = true;
+            outputPreview.hidden = true;
+            outputGif.hidden = true;
+            statusMsg.hidden = true;
+
+            const url = trackUrl(URL.createObjectURL(file));
+            preview.src = url;
+            preview.classList.toggle('audio-mode', mediaKind === 'audio');
+            fileNameEl.textContent = file.name;
+
+            preview.addEventListener('loadedmetadata', onLoadedMeta, { once: true });
+        }
+
+        function onLoadedMeta() {
+            if (isFinite(preview.duration) && preview.duration > 0) {
+                duration = preview.duration;
+                finishLoad();
+                return;
+            }
+            // Some webm / streamed files report Infinity until forced to seek to
+            // the end, at which point the real duration becomes available.
+            const onFix = () => {
+                preview.removeEventListener('timeupdate', onFix);
+                duration = isFinite(preview.duration) ? preview.duration : preview.currentTime;
+                preview.currentTime = 0;
+                finishLoad();
+            };
+            preview.addEventListener('timeupdate', onFix);
+            preview.currentTime = 1e7;
+        }
+
+        function finishLoad() {
+            selStart = 0;
+            selEnd = duration;
+            renderTimeline();
+            buildFormatOptions();
+            updateFieldVisibility();
+            updateWarning();
+            editor.hidden = false;
+        }
+
+        // ---- Timeline -----------------------------------------------------------
+        function pctOf(t) { return duration > 0 ? (t / duration) * 100 : 0; }
+
+        function renderTimeline() {
+            const a = pctOf(selStart), b = pctOf(selEnd);
+            tlSel.style.left = a + '%';
+            tlSel.style.width = (b - a) + '%';
+            hStart.style.left = a + '%';
+            hEnd.style.left = b + '%';
+            tStartEl.textContent = fmtTime(selStart);
+            tEndEl.textContent = fmtTime(selEnd);
+            updatePlayhead();
+        }
+        function updatePlayhead() {
+            tlPlayhead.style.left = pctOf(preview.currentTime) + '%';
+            tCurrentEl.textContent = fmtTime(preview.currentTime);
+        }
+
+        preview.addEventListener('timeupdate', () => {
+            updatePlayhead();
+            if (playingSelection && preview.currentTime >= selEnd) {
+                preview.pause();
+                playingSelection = false;
+            }
+        });
+
+        // Drag handles + click-to-seek
+        let dragging = null; // 'start' | 'end' | null
+        function timeAtClientX(clientX) {
+            const rect = timeline.getBoundingClientRect();
+            const frac = clamp((clientX - rect.left) / rect.width, 0, 1);
+            return frac * duration;
+        }
+        hStart.addEventListener('pointerdown', e => { dragging = 'start'; timeline.setPointerCapture(e.pointerId); e.preventDefault(); });
+        hEnd.addEventListener('pointerdown',   e => { dragging = 'end';   timeline.setPointerCapture(e.pointerId); e.preventDefault(); });
+        timeline.addEventListener('pointerdown', e => {
+            if (dragging) return;                 // started on a handle
+            const t = timeAtClientX(e.clientX);
+            preview.currentTime = t;              // click empty track → seek
+            updatePlayhead();
+        });
+        timeline.addEventListener('pointermove', e => {
+            if (!dragging) return;
+            const t = timeAtClientX(e.clientX);
+            if (dragging === 'start') selStart = clamp(t, 0, selEnd - 0.1);
+            else                      selEnd   = clamp(t, selStart + 0.1, duration);
+            renderTimeline();
+            updateWarning();
+        });
+        const endDrag = () => { dragging = null; };
+        timeline.addEventListener('pointerup', endDrag);
+        timeline.addEventListener('pointercancel', endDrag);
+
+        // ---- Selection controls -------------------------------------------------
+        let playingSelection = false;
+        playSelBtn.addEventListener('click', () => {
+            preview.currentTime = selStart;
+            playingSelection = true;
+            preview.play();
+        });
+        setStartBtn.addEventListener('click', () => {
+            selStart = clamp(preview.currentTime, 0, selEnd - 0.1);
+            renderTimeline(); updateWarning();
+        });
+        setEndBtn.addEventListener('click', () => {
+            selEnd = clamp(preview.currentTime, selStart + 0.1, duration);
+            renderTimeline(); updateWarning();
+        });
+
+        // ---- Format / size options ----------------------------------------------
+        function buildFormatOptions() {
+            const list = mediaKind === 'video' ? VIDEO_FORMATS : AUDIO_FORMATS;
+            format = list[0];
+            formatSel.innerHTML = '';
+            list.forEach((key, i) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'opt-btn' + (i === 0 ? ' active' : '');
+                btn.dataset.fmt = key;
+                btn.textContent = FORMATS[key].label;
+                formatSel.appendChild(btn);
+            });
+        }
+        formatSel.addEventListener('click', e => {
+            const btn = e.target.closest('.opt-btn');
+            if (!btn) return;
+            formatSel.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            format = btn.dataset.fmt;
+            updateFieldVisibility();
+            updateWarning();
+        });
+        document.getElementById('res-selector').addEventListener('click', e => {
+            const btn = e.target.closest('.opt-btn');
+            if (!btn) return;
+            e.currentTarget.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            resHeight = +btn.dataset.h;
+            updateWarning();
+        });
+        document.getElementById('fps-selector').addEventListener('click', e => {
+            const btn = e.target.closest('.opt-btn');
+            if (!btn) return;
+            e.currentTarget.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            gifFps = +btn.dataset.fps;
+        });
+        document.getElementById('bitrate-selector').addEventListener('click', e => {
+            const btn = e.target.closest('.opt-btn');
+            if (!btn) return;
+            e.currentTarget.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            bitrate = btn.dataset.br;
+        });
+
+        function updateFieldVisibility() {
+            const kind = FORMATS[format].kind;   // 'video' | 'gif' | 'audio'
+            resField.hidden     = !(kind === 'video' || kind === 'gif');
+            fpsField.hidden     = kind !== 'gif';
+            bitrateField.hidden = !(kind === 'audio' && format !== 'wav');
+        }
+
+        function updateWarning() {
+            const secs = selEnd - selStart;
+            const kind = FORMATS[format].kind;
+            let msg = '';
+            if (secs > 60 && (kind === 'video' || kind === 'gif')) {
+                msg = `Long selection (${Math.round(secs)}s) — encoding in the browser may be slow and memory-heavy.`;
+            } else if (kind === 'gif' && secs > 15) {
+                msg = `GIFs of ${Math.round(secs)}s can get very large. Consider a shorter clip or lower size/fps.`;
+            }
+            sizeWarn.hidden = !msg;
+            sizeWarn.textContent = msg;
+        }
+
+        // ---- FFmpeg -------------------------------------------------------------
+        // The worker chunk is the UMD build; the core must be the ESM build so the
+        // module worker can `import()` it (UMD has no default export). Blob URLs are
+        // cached so recovering from a crash re-instantiates without re-downloading.
+        const FF_UMD   = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd';
+        const CORE_ESM = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+
+        async function ensureFFmpeg() {
+            if (ffmpeg) return ffmpeg;
+            const { FFmpeg } = FFmpegWASM;
+            const { toBlobURL } = FFmpegUtil;
+            if (!coreBlobs) {
+                statusMsg.textContent = 'Loading video engine (~32 MB, first time only)…';
+                coreBlobs = {
+                    classWorkerURL: await toBlobURL(`${FF_UMD}/814.ffmpeg.js`, 'text/javascript'),
+                    coreURL: await toBlobURL(`${CORE_ESM}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${CORE_ESM}/ffmpeg-core.wasm`, 'application/wasm'),
+                };
+            }
+            const ff = new FFmpeg();
+            ff.on('progress', ({ progress }) => {
+                if (progress >= 0 && progress <= 1) {
+                    statusMsg.textContent = `Encoding… ${Math.round(progress * 100)}%`;
+                }
+            });
+            await ff.load(coreBlobs);
+            ffmpeg = ff;
+            return ffmpeg;
+        }
+
+        // After a wasm trap the instance is unusable; drop it so the next clip
+        // starts from a fresh engine instead of failing forever.
+        function resetFFmpeg() {
+            try { ffmpeg && ffmpeg.terminate(); } catch {}
+            ffmpeg = null;
+        }
+
+        function buildArgs(inName, outName) {
+            const ss = selStart.toFixed(3);
+            const dur = (selEnd - selStart).toFixed(3);
+            const kind = FORMATS[format].kind;
+            // Input seeking (-ss before -i) is fast and, because we always
+            // re-encode, still frame-accurate.
+            const args = ['-ss', ss, '-i', inName, '-t', dur];
+
+            if (kind === 'video') {
+                args.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart');
+                args.push('-c:a', 'aac', '-b:a', '128k');
+                if (resHeight) args.push('-vf', `scale=-2:${resHeight}`);
+            } else if (kind === 'gif') {
+                const scale = resHeight ? `,scale=-1:${resHeight}:flags=lanczos` : '';
+                args.push('-an', '-vf',
+                    `fps=${gifFps}${scale},split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`,
+                    '-loop', '0');
+            } else { // audio
+                args.push('-vn');
+                if (format === 'mp3')      args.push('-c:a', 'libmp3lame', '-b:a', bitrate);
+                else if (format === 'm4a') args.push('-c:a', 'aac', '-b:a', bitrate);
+                else if (format === 'wav') args.push('-c:a', 'pcm_s16le');
+            }
+            args.push(outName);
+            return args;
+        }
+
+        function baseName(name) {
+            const dot = name.lastIndexOf('.');
+            return dot > 0 ? name.slice(0, dot) : name;
+        }
+
+        // ---- Clip ---------------------------------------------------------------
+        clipBtn.addEventListener('click', async () => {
+            if (selEnd - selStart < 0.1) { alert('Selection is too short.'); return; }
+            const { fetchFile } = FFmpegUtil;
+            const f = FORMATS[format];
+
+            clipBtn.disabled = true;
+            statusMsg.hidden = false;
+            outputSection.hidden = true;
+            outputPreview.hidden = true;
+            outputGif.hidden = true;
+
+            try {
+                const ff = await ensureFFmpeg();
+                const inName = 'input' + (mediaFile.name.match(/\.[a-z0-9]+$/i)?.[0] || '');
+                const outName = 'clip.' + f.ext;
+
+                statusMsg.textContent = 'Reading file…';
+                await ff.writeFile(inName, await fetchFile(mediaFile));
+
+                statusMsg.textContent = 'Encoding…';
+                await ff.exec(buildArgs(inName, outName));
+
+                const data = await ff.readFile(outName);
+                const blob = new Blob([data.buffer], { type: f.mime });
+                const url = trackUrl(URL.createObjectURL(blob));
+
+                const outFile = `${baseName(mediaFile.name)}-clip.${f.ext}`;
+                downloadLink.href = url;
+                downloadLink.download = outFile;
+                downloadLink.textContent = `Download ${outFile}`;
+                outputSizeEl.textContent = `${(blob.size / 1048576).toFixed(2)} MB · ${(selEnd - selStart).toFixed(1)}s`;
+
+                if (f.kind === 'gif') {
+                    outputGif.src = url;
+                    outputGif.hidden = false;
+                } else {
+                    outputPreview.src = url;
+                    outputPreview.hidden = false;
+                }
+
+                // clean up ffmpeg FS
+                try { await ff.deleteFile(inName); await ff.deleteFile(outName); } catch {}
+
+                outputSection.hidden = false;
+                statusMsg.hidden = true;
+            } catch (err) {
+                const msg = err && err.message ? err.message : String(err);
+                statusMsg.textContent = /memory access|out of bounds|abort/i.test(msg)
+                    ? 'Ran out of memory encoding this clip. Try a shorter selection, smaller size, or lower frame rate, then clip again.'
+                    : `Error: ${msg}`;
+                resetFFmpeg();   // instance is dead after a trap — rebuild next time
+            } finally {
+                clipBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
