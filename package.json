@@ -1,0 +1,19 @@
+{
+  "name": "tools.wisefowl.org",
+  "private": true,
+  "description": "Browser-based tools for tools.wisefowl.org. The site itself has no build step; this package.json exists only for the dev-time test suite.",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "setup": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@ffmpeg/core": "0.12.6",
+    "@ffmpeg/ffmpeg": "0.12.10",
+    "@ffmpeg/util": "0.12.1",
+    "jszip": "3.10.1",
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "4.9.155"
+  }
+}

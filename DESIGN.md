@@ -101,6 +101,9 @@ Reusable patterns. Copy the ones you need; keep the class names.
 
 - One tool per file, one tool per commit.
 - Add the tool to `index.html` under **Tools** with a one-line `.tool-desc`.
+- Add an end-to-end test: `tests/<tool>.spec.js` (see `tests/README.md`). The
+  spec drives the shipped HTML in a browser; CDN deps are served from
+  `node_modules` so it runs offline.
 - Conventional commits, scope = tool name (kebab-case). The changelog page
   parses `type(scope): message` and renders the scope as a badge:
   ```
