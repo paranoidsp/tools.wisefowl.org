@@ -21,6 +21,32 @@ async function clip(page, label) {
   }
 }
 
+async function attachRaw(page, name, type, bytes) {
+  await page.evaluate(({ name, type, bytes }) => {
+    const file = new File([new Uint8Array(bytes)], name, { type });
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    const input = document.getElementById('file-input');
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+  }, { name, type, bytes });
+}
+
+test('surfaces a visible error for a file it cannot decode (no silent failure)', async ({ page }) => {
+  await page.goto('/media-clip.html');
+  // Valid media extension, but the bytes are garbage the browser can't decode.
+  await attachRaw(page, 'broken.mp4', '', [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  await expect(page.locator('#load-error')).toBeVisible();
+  await expect(page.locator('#editor')).toBeHidden();
+});
+
+test('rejects a non-media file with a visible message', async ({ page }) => {
+  await page.goto('/media-clip.html');
+  await attachRaw(page, 'notes.txt', 'text/plain', [104, 105]);
+  await expect(page.locator('#load-error')).toContainText(/audio or video/i);
+  await expect(page.locator('#editor')).toBeHidden();
+});
+
 test('accepts a file by extension when the MIME type is empty (.m4a)', async ({ page }) => {
   await page.goto('/media-clip.html');
   // Simulate an .m4a that the OS reports with no MIME type — it must not be rejected.

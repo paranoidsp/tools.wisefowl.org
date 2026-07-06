@@ -122,6 +122,11 @@
         #clip-btn:disabled { background: #93c5fd; cursor: not-allowed; }
 
         #status-msg { color: #6b7280; font-size: 0.9rem; margin-top: 0.75rem; }
+        #load-error {
+            color: #dc2626; font-size: 0.9rem;
+            background: #fef2f2; border: 1px solid #fecaca;
+            border-radius: 4px; padding: 0.6rem 0.75rem; margin: 1rem 0;
+        }
         #size-warning {
             font-size: 0.82rem; color: #92400e; background: #fef3c7;
             border: 1px solid #fde68a; border-radius: 4px;
@@ -147,6 +152,7 @@
         <p class="hint">or <button id="browse-btn" type="button">browse files</button></p>
         <input type="file" id="file-input" accept="audio/*,video/*,.m4a,.mp3,.aac,.wav,.ogg,.oga,.opus,.flac,.weba,.mp4,.m4v,.mov,.webm,.mkv,.avi,.ogv,.3gp" hidden>
     </div>
+    <p id="load-error" hidden></p>
 
     <section id="editor" hidden>
         <video id="preview" controls playsinline></video>
@@ -282,6 +288,18 @@
         const outputSizeEl  = document.getElementById('output-size');
         const outputPreview = document.getElementById('output-preview');
         const outputGif     = document.getElementById('output-gif');
+        const loadError     = document.getElementById('load-error');
+
+        const LOG = '[media-clip]';
+        function showLoadError(msg) {
+            loadError.textContent = msg;
+            loadError.hidden = false;
+            console.error(LOG, msg);
+        }
+        function clearLoadError() {
+            loadError.hidden = true;
+            loadError.textContent = '';
+        }
 
         // ---- Helpers ------------------------------------------------------------
         function fmtTime(t) {
@@ -320,30 +338,62 @@
             return null;
         }
 
+        const MEDIA_ERR = {
+            1: 'loading was aborted',
+            2: 'a network error occurred',
+            3: 'the file could not be decoded',
+            4: 'the format is not supported by this browser',
+        };
+
         function loadFile(file) {
+            clearLoadError();
             const kind = classifyMedia(file);
+            console.log(LOG, 'picked', { name: file.name, type: file.type || '(empty)', size: file.size, classified: kind });
             if (!kind) {
-                alert('Please choose an audio or video file.');
+                showLoadError(`"${file.name}" doesn't look like an audio or video file. Pick a media file such as MP4, MOV, WebM, MP3, M4A or WAV.`);
                 return;
             }
             mediaFile = file;
             mediaKind = kind;
 
             revokeOutputs();
+            editor.hidden = true;
             outputSection.hidden = true;
             outputPreview.hidden = true;
             outputGif.hidden = true;
             statusMsg.hidden = true;
 
             const url = trackUrl(URL.createObjectURL(file));
+            // Attach handlers before setting src so we never miss the event.
+            preview.addEventListener('loadedmetadata', onLoadedMeta);
+            preview.addEventListener('error', onMediaError);
             preview.src = url;
             preview.classList.toggle('audio-mode', mediaKind === 'audio');
             fileNameEl.textContent = file.name;
+        }
 
-            preview.addEventListener('loadedmetadata', onLoadedMeta, { once: true });
+        function detachLoadHandlers() {
+            preview.removeEventListener('loadedmetadata', onLoadedMeta);
+            preview.removeEventListener('error', onMediaError);
+        }
+
+        // Fires when the browser can't load/decode the picked file — the case
+        // that used to fail silently (e.g. AAC/M4A in Firefox).
+        function onMediaError() {
+            detachLoadHandlers();
+            const err = preview.error;
+            const reason = err ? (MEDIA_ERR[err.code] || `error ${err.code}`) : 'unknown error';
+            console.error(LOG, 'media load failed', { code: err && err.code, message: err && err.message, file: mediaFile && mediaFile.name });
+            const ext = mediaFile ? (mediaFile.name.split('.').pop() || '').toLowerCase() : '';
+            const aacHint = /m4a|aac|mp4|mov/.test(ext)
+                ? ' Firefox often can’t play AAC/M4A audio — try Chrome, or convert the file to MP3 or WAV first.'
+                : '';
+            showLoadError(`Couldn’t open "${mediaFile ? mediaFile.name : 'file'}" — ${reason}.${aacHint}`);
         }
 
         function onLoadedMeta() {
+            detachLoadHandlers();
+            console.log(LOG, 'metadata loaded', { duration: preview.duration, kind: mediaKind });
             if (isFinite(preview.duration) && preview.duration > 0) {
                 duration = preview.duration;
                 finishLoad();
