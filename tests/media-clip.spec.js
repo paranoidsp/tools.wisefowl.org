@@ -92,6 +92,24 @@ test.describe('video input', () => {
     expect(await page.locator('#download-link').getAttribute('href')).toMatch(/^blob:/);
   });
 
+  test('lets you rename the output before downloading', async ({ page }) => {
+    await clip(page, 'MP3');
+    await expect(page.locator('#filename-input')).toHaveValue(/-clip$/);
+    await expect(page.locator('#filename-ext')).toHaveText('.mp3');
+    const input = page.locator('#filename-input');
+    const link = page.locator('#download-link');
+    await expect(link).toHaveAttribute('download', /-clip\.mp3$/);
+
+    await input.fill('my song');
+    await expect(link).toHaveAttribute('download', 'my song.mp3');
+
+    // Illegal characters stripped, extension preserved, empty → default.
+    await input.fill('a/b:c');
+    await expect(link).toHaveAttribute('download', 'abc.mp3');
+    await input.fill('');
+    await expect(link).toHaveAttribute('download', 'clip.mp3');
+  });
+
   test('trims to the selected range', async ({ page }) => {
     // Select [1.0s, 2.0s] via the set-start / set-end buttons.
     await page.evaluate(async () => {

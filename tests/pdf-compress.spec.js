@@ -33,12 +33,33 @@ test('separate mode offers a ZIP plus individual downloads', async ({ page }) =>
 
   const link = page.locator('#download-link');
   await expect(link).toHaveAttribute('download', /\.zip$/);
-  await expect(link).toContainText('ZIP');
+  await expect(page.locator('#filename-ext')).toHaveText('.zip');
 
   // One individual download link per input file.
   await expect(page.locator('#file-list')).toBeVisible();
   await expect(page.locator('#file-list a')).toHaveCount(3);
   await expect(page.locator('#file-list a').first()).toHaveAttribute('download', /-compressed\.pdf$/);
+});
+
+test('lets you rename the output before downloading', async ({ page }) => {
+  await attachImages(page, 2);
+  await page.click('#create-btn');
+  await expect(page.locator('#output-section')).toBeVisible({ timeout: 60_000 });
+
+  await expect(page.locator('#filename-ext')).toHaveText('.pdf');
+  const input = page.locator('#filename-input');
+  const link = page.locator('#download-link');
+
+  await input.fill('my report');
+  await expect(link).toHaveAttribute('download', 'my report.pdf');
+
+  // Illegal filename characters are stripped; the extension is preserved.
+  await input.fill('a/b:c*d');
+  await expect(link).toHaveAttribute('download', 'abcd.pdf');
+
+  // Empty falls back to a sensible default.
+  await input.fill('');
+  await expect(link).toHaveAttribute('download', 'compressed.pdf');
 });
 
 test('accepts a PDF input (exercises pdf.js)', async ({ page }) => {

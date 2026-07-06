@@ -78,6 +78,45 @@ a:hover {
     padding: 1rem 0;
 }
 
+/* Editable filename + download button (shared by tools with a rename field).
+   The base name is editable; the extension is locked so it can't be broken. */
+.filename-field {
+    display: inline-flex;
+    align-items: baseline;
+    border: 1px solid #e5e7eb;
+    border-radius: 5px;
+    background: white;
+    overflow: hidden;
+    max-width: 100%;
+}
+.filename-field:focus-within { border-color: #2563eb; }
+.filename-input {
+    flex: 1;
+    min-width: 6rem;
+    border: none;
+    outline: none;
+    padding: 0.4rem 0.15rem 0.4rem 0.6rem;
+    font: inherit;
+    font-size: 0.9rem;
+    color: #1a1a1a;
+}
+.filename-ext {
+    padding: 0.4rem 0.6rem 0.4rem 0;
+    color: #9ca3af;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+.download-btn {
+    display: inline-block;
+    padding: 0.4rem 1rem;
+    background: #2563eb;
+    color: white;
+    border-radius: 5px;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+.download-btn:hover { background: #1d4ed8; text-decoration: none; }
+
 footer {
     margin-top: 3rem;
     padding-top: 1rem;

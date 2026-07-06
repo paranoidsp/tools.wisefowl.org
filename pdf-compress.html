@@ -101,6 +101,7 @@
             align-items: center;
             gap: 1rem;
             padding: 0.75rem 0;
+            flex-wrap: wrap;
         }
         #size-comparison { color: #16a34a; font-size: 0.9rem; }
         #status-msg { color: #6b7280; font-size: 0.9rem; margin-top: 0.5rem; }
@@ -173,7 +174,11 @@
     <section id="output-section" hidden>
         <h2>Output</h2>
         <div id="output-row">
-            <a id="download-link" href="#">Download PDF</a>
+            <span class="filename-field">
+                <input id="filename-input" class="filename-input" type="text" spellcheck="false" autocomplete="off" aria-label="Output file name">
+                <span id="filename-ext" class="filename-ext"></span>
+            </span>
+            <a id="download-link" class="download-btn" href="#" download>Download</a>
             <span id="size-comparison"></span>
         </div>
         <ul id="file-list" hidden></ul>
@@ -222,8 +227,28 @@
         const statusMsg     = document.getElementById('status-msg');
         const outputSection = document.getElementById('output-section');
         const downloadLink  = document.getElementById('download-link');
+        const filenameInput = document.getElementById('filename-input');
+        const filenameExt   = document.getElementById('filename-ext');
         const sizeComp      = document.getElementById('size-comparison');
         const fileList      = document.getElementById('file-list');
+
+        // Editable output filename. The base is user-editable; the extension is
+        // fixed so it can't be broken. The <a download> updates as they type.
+        function sanitizeBase(s) {
+            return s.replace(/[\/\\:*?"<>|\x00-\x1f]/g, '').replace(/\.+$/, '').trim();
+        }
+        function applyDownloadName() {
+            const base = sanitizeBase(filenameInput.value) || 'compressed';
+            downloadLink.download = base + filenameExt.textContent;
+        }
+        filenameInput.addEventListener('input', applyDownloadName);
+        function setDownload(name, href) {
+            const dot = name.lastIndexOf('.');
+            filenameInput.value = dot > 0 ? name.slice(0, dot) : name;
+            filenameExt.textContent = dot > 0 ? name.slice(dot) : '';
+            downloadLink.href = href;
+            applyDownloadName();
+        }
 
         // Drop zone
         dropZone.addEventListener('click', () => fileInput.click());
@@ -435,9 +460,7 @@
                     const outName = valid.length === 1
                         ? compressedName(valid[0].name)
                         : `compressed-${new Date().toISOString().slice(0, 10)}.pdf`;
-                    downloadLink.href = url;
-                    downloadLink.download = outName;
-                    downloadLink.textContent = `Download ${outName}`;
+                    setDownload(outName, url);
 
                     const inMB  = (totalInputBytes / 1048576).toFixed(1);
                     const outMB = (pdfBytes.byteLength / 1048576).toFixed(1);
@@ -469,9 +492,7 @@
                     const zipUrl = trackUrl(URL.createObjectURL(zipBlob));
 
                     const outName = `compressed-${new Date().toISOString().slice(0, 10)}.zip`;
-                    downloadLink.href = zipUrl;
-                    downloadLink.download = outName;
-                    downloadLink.textContent = `Download all as ZIP (${valid.length} PDFs)`;
+                    setDownload(outName, zipUrl);
 
                     // Individual file download links
                     fileList.innerHTML = '<li class="files-caption">Or download files individually:</li>';

@@ -219,7 +219,11 @@
     <section id="output-section" hidden>
         <h2>Output</h2>
         <div id="output-row">
-            <a id="download-link" href="#">Download</a>
+            <span class="filename-field">
+                <input id="filename-input" class="filename-input" type="text" spellcheck="false" autocomplete="off" aria-label="Output file name">
+                <span id="filename-ext" class="filename-ext"></span>
+            </span>
+            <a id="download-link" class="download-btn" href="#" download>Download</a>
             <span id="output-size"></span>
         </div>
         <video id="output-preview" controls playsinline style="width:100%;max-height:45vh;background:#1a1a1a;border-radius:6px;margin-top:0.5rem;" hidden></video>
@@ -316,7 +320,26 @@
         const statusMsg  = document.getElementById('status-msg');
         const outputSection = document.getElementById('output-section');
         const downloadLink  = document.getElementById('download-link');
+        const filenameInput = document.getElementById('filename-input');
+        const filenameExt   = document.getElementById('filename-ext');
         const outputSizeEl  = document.getElementById('output-size');
+
+        // Editable output filename. The base is user-editable; the extension is
+        // fixed so it can't be broken. The <a download> updates as they type.
+        function sanitizeBase(s) {
+            return s.replace(/[\/\\:*?"<>|\x00-\x1f]/g, '').replace(/\.+$/, '').trim();
+        }
+        function applyDownloadName() {
+            const base = sanitizeBase(filenameInput.value) || 'clip';
+            downloadLink.download = base + filenameExt.textContent;
+        }
+        filenameInput.addEventListener('input', applyDownloadName);
+        function setDownload(base, ext, href) {
+            filenameInput.value = base;
+            filenameExt.textContent = '.' + ext;
+            downloadLink.href = href;
+            applyDownloadName();
+        }
         const outputPreview = document.getElementById('output-preview');
         const outputGif     = document.getElementById('output-gif');
         const loadError     = document.getElementById('load-error');
@@ -781,10 +804,7 @@
                 const blob = new Blob([data.buffer], { type: f.mime });
                 const url = trackUrl(URL.createObjectURL(blob));
 
-                const outFile = `${baseName(mediaFile.name)}-clip.${f.ext}`;
-                downloadLink.href = url;
-                downloadLink.download = outFile;
-                downloadLink.textContent = `Download ${outFile}`;
+                setDownload(`${baseName(mediaFile.name)}-clip`, f.ext, url);
                 outputSizeEl.textContent = `${(blob.size / 1048576).toFixed(2)} MB · ${(selEnd - selStart).toFixed(1)}s`;
 
                 if (f.kind === 'gif') {
