@@ -21,6 +21,14 @@ async function clip(page, label) {
   }
 }
 
+test('accepts a file by extension when the MIME type is empty (.m4a)', async ({ page }) => {
+  await page.goto('/media-clip.html');
+  // Simulate an .m4a that the OS reports with no MIME type — it must not be rejected.
+  await attachMedia(page, { video: false, ms: 2000, name: 'sound.m4a', type: '' });
+  await page.waitForFunction(() => !document.getElementById('editor').hidden, { timeout: 30_000 });
+  await expect(page.locator('#preview')).toHaveClass(/audio-mode/);
+});
+
 test.describe('video input', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/media-clip.html');

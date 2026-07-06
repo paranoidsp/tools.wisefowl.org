@@ -145,7 +145,7 @@
     <div id="drop-zone">
         <p>Drop an audio or video file here</p>
         <p class="hint">or <button id="browse-btn" type="button">browse files</button></p>
-        <input type="file" id="file-input" accept="audio/*,video/*" hidden>
+        <input type="file" id="file-input" accept="audio/*,video/*,.m4a,.mp3,.aac,.wav,.ogg,.oga,.opus,.flac,.weba,.mp4,.m4v,.mov,.webm,.mkv,.avi,.ogv,.3gp" hidden>
     </div>
 
     <section id="editor" hidden>
@@ -308,13 +308,26 @@
             fileInput.value = '';
         });
 
+        // .m4a and some other media files report an empty or non-standard MIME
+        // type, so fall back to the extension when the type is unhelpful.
+        const AUDIO_EXT = ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'];
+        const VIDEO_EXT = ['mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi', 'ogv', '3gp'];
+        function classifyMedia(file) {
+            const type = file.type || '';
+            const ext = (file.name.toLowerCase().match(/\.([a-z0-9]+)$/) || [, ''])[1];
+            if (type.startsWith('audio/') || AUDIO_EXT.includes(ext)) return 'audio';
+            if (type.startsWith('video/') || VIDEO_EXT.includes(ext)) return 'video';
+            return null;
+        }
+
         function loadFile(file) {
-            if (!/^(audio|video)\//.test(file.type)) {
+            const kind = classifyMedia(file);
+            if (!kind) {
                 alert('Please choose an audio or video file.');
                 return;
             }
             mediaFile = file;
-            mediaKind = file.type.startsWith('audio/') ? 'audio' : 'video';
+            mediaKind = kind;
 
             revokeOutputs();
             outputSection.hidden = true;

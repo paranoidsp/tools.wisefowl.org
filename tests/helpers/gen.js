@@ -43,9 +43,12 @@ async function attachPdf(page, pages = 2, inputSel = '#file-input') {
   }, { pages, inputSel });
 }
 
-// Record a short webm (video+audio, or audio-only) and attach it.
-async function attachMedia(page, { video = true, ms = 2500, inputSel = '#file-input' } = {}) {
-  await page.evaluate(async ({ video, ms, inputSel }) => {
+// Record a short webm (video+audio, or audio-only) and attach it. `name` and
+// `type` can be overridden to simulate files that report an odd/empty MIME type
+// (e.g. .m4a) — the recorded bytes are always webm, which the browser sniffs
+// from content regardless of the filename.
+async function attachMedia(page, { video = true, ms = 2500, inputSel = '#file-input', name, type } = {}) {
+  await page.evaluate(async ({ video, ms, inputSel, name, type }) => {
     const tracks = [];
     let iv, osc, ac, canvas;
     if (video) {
@@ -80,13 +83,13 @@ async function attachMedia(page, { video = true, ms = 2500, inputSel = '#file-in
     osc.stop(); rec.stop();
     await stopped;
 
-    const file = new File(chunks, video ? 'sample.webm' : 'tone.webm', { type: mime });
+    const file = new File(chunks, name || (video ? 'sample.webm' : 'tone.webm'), { type: type === undefined ? mime : type });
     const dt = new DataTransfer();
     dt.items.add(file);
     const input = document.querySelector(inputSel);
     input.files = dt.files;
     input.dispatchEvent(new Event('change'));
-  }, { video, ms, inputSel });
+  }, { video, ms, inputSel, name, type });
 }
 
 module.exports = { attachImages, attachPdf, attachMedia };
