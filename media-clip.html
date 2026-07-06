@@ -142,7 +142,7 @@
     <header>
         <div>
             <h1>Media Clipper</h1>
-            <p class="subtitle">Trim a clip from an audio or video file. Export video as MP4 or GIF, or audio as MP3, M4A, or WAV. Files never leave your device.</p>
+            <p class="subtitle">Trim a clip from an audio or video file. Export video as MP4 or GIF, or audio as MP3, M4A, AAC, OGG, FLAC or WAV. Files never leave your device.</p>
         </div>
         <a class="private-link" href="/">← Tools</a>
     </header>
@@ -178,6 +178,7 @@
 
         <p class="field-label">Format</p>
         <div class="selector" id="format-selector"></div>
+        <p class="note" id="format-hint" hidden>Audio formats (MP3, AAC, FLAC…) export just the soundtrack.</p>
 
         <div id="res-field" hidden>
             <p class="field-label">Size</p>
@@ -231,16 +232,34 @@
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
     <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
     <script>
-        // ---- Format definitions -------------------------------------------------
+        // ---- Format registry ----------------------------------------------------
+        // Single source of truth for every output format. To add one, add an entry
+        // here — no other code needs to change. Each entry declares:
+        //   kind  : 'video' | 'gif' | 'audio' — drives which size controls show
+        //   ext/mime : output filename extension + blob type
+        //   codec : ffmpeg encoder args (audio: after -vn; video: full a/v args)
+        //   bitrate : true for lossy audio (shows the quality selector)
+        //
+        // We expose what @ffmpeg/core reliably encodes — not the whole of ffmpeg.
+        // VP8/VP9/WebM are intentionally excluded: they crash or hang in wasm
+        // (see the media-clipper history). H.264/MP4 covers video output.
         const FORMATS = {
-            mp4:  { label: 'MP4',        ext: 'mp4', mime: 'video/mp4',  kind: 'video' },
-            gif:  { label: 'GIF',        ext: 'gif', mime: 'image/gif',  kind: 'gif' },
-            mp3:  { label: 'MP3 (audio)', ext: 'mp3', mime: 'audio/mpeg', kind: 'audio' },
-            m4a:  { label: 'M4A (audio)', ext: 'm4a', mime: 'audio/mp4',  kind: 'audio' },
-            wav:  { label: 'WAV',        ext: 'wav', mime: 'audio/wav',  kind: 'audio' },
+            // Video
+            mp4:  { label: 'MP4',  ext: 'mp4', mime: 'video/mp4', kind: 'video',
+                    codec: ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+                            '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'aac', '-b:a', '128k'] },
+            gif:  { label: 'GIF',  ext: 'gif', mime: 'image/gif', kind: 'gif' },
+            // Audio (also used to extract the soundtrack from a video)
+            mp3:  { label: 'MP3',  ext: 'mp3',  mime: 'audio/mpeg', kind: 'audio', bitrate: true,  codec: ['-c:a', 'libmp3lame'] },
+            m4a:  { label: 'M4A',  ext: 'm4a',  mime: 'audio/mp4',  kind: 'audio', bitrate: true,  codec: ['-c:a', 'aac'] },
+            aac:  { label: 'AAC',  ext: 'aac',  mime: 'audio/aac',  kind: 'audio', bitrate: true,  codec: ['-c:a', 'aac'] },
+            ogg:  { label: 'OGG',  ext: 'ogg',  mime: 'audio/ogg',  kind: 'audio', bitrate: true,  codec: ['-c:a', 'libvorbis'] },
+            flac: { label: 'FLAC', ext: 'flac', mime: 'audio/flac', kind: 'audio', bitrate: false, codec: ['-c:a', 'flac'] },
+            wav:  { label: 'WAV',  ext: 'wav',  mime: 'audio/wav',  kind: 'audio', bitrate: false, codec: ['-c:a', 'pcm_s16le'] },
         };
-        const VIDEO_FORMATS = ['mp4', 'gif', 'mp3', 'm4a'];
-        const AUDIO_FORMATS = ['mp3', 'm4a', 'wav'];
+        const AUDIO_FORMATS = ['mp3', 'm4a', 'aac', 'ogg', 'flac', 'wav'];
+        // Video inputs: video outputs first, then every audio format (extract sound).
+        const VIDEO_FORMATS = ['mp4', 'gif', ...AUDIO_FORMATS];
 
         // ---- State --------------------------------------------------------------
         let mediaFile = null;
@@ -277,6 +296,7 @@
         const setStartBtn = document.getElementById('set-start');
         const setEndBtn  = document.getElementById('set-end');
         const formatSel  = document.getElementById('format-selector');
+        const formatHint = document.getElementById('format-hint');
         const resField   = document.getElementById('res-field');
         const fpsField   = document.getElementById('fps-field');
         const bitrateField = document.getElementById('bitrate-field');
@@ -328,11 +348,19 @@
 
         // .m4a and some other media files report an empty or non-standard MIME
         // type, so fall back to the extension when the type is unhelpful.
-        const AUDIO_EXT = ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba'];
-        const VIDEO_EXT = ['mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi', 'ogv', '3gp'];
+        const MIME_BY_EXT = {
+            mp3: 'audio/mpeg', m4a: 'audio/mp4', aac: 'audio/aac', wav: 'audio/wav',
+            ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg', flac: 'audio/flac', weba: 'audio/webm',
+            mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
+            mkv: 'video/x-matroska', avi: 'video/x-msvideo', ogv: 'video/ogg', '3gp': 'video/3gpp',
+        };
+        const AUDIO_EXT = Object.keys(MIME_BY_EXT).filter(e => MIME_BY_EXT[e].startsWith('audio/'));
+        const VIDEO_EXT = Object.keys(MIME_BY_EXT).filter(e => MIME_BY_EXT[e].startsWith('video/'));
+        const extOf = name => (name.toLowerCase().match(/\.([a-z0-9]+)$/) || [, ''])[1];
+
         function classifyMedia(file) {
             const type = file.type || '';
-            const ext = (file.name.toLowerCase().match(/\.([a-z0-9]+)$/) || [, ''])[1];
+            const ext = extOf(file.name);
             if (type.startsWith('audio/') || AUDIO_EXT.includes(ext)) return 'audio';
             if (type.startsWith('video/') || VIDEO_EXT.includes(ext)) return 'video';
             return null;
@@ -363,7 +391,15 @@
             outputGif.hidden = true;
             statusMsg.hidden = true;
 
-            const url = trackUrl(URL.createObjectURL(file));
+            // Safari won't decode a blob URL whose Blob has no MIME type, which is
+            // exactly what a typeless .m4a produces. Re-tag it from the extension so
+            // the browser knows what it is. (slice re-types without copying data.)
+            let source = file;
+            if (!file.type) {
+                const mime = MIME_BY_EXT[extOf(file.name)];
+                if (mime) source = file.slice(0, file.size, mime);
+            }
+            const url = trackUrl(URL.createObjectURL(source));
             // Attach handlers before setting src so we never miss the event.
             preview.addEventListener('loadedmetadata', onLoadedMeta);
             preview.addEventListener('error', onMediaError);
@@ -384,11 +420,8 @@
             const err = preview.error;
             const reason = err ? (MEDIA_ERR[err.code] || `error ${err.code}`) : 'unknown error';
             console.error(LOG, 'media load failed', { code: err && err.code, message: err && err.message, file: mediaFile && mediaFile.name });
-            const ext = mediaFile ? (mediaFile.name.split('.').pop() || '').toLowerCase() : '';
-            const aacHint = /m4a|aac|mp4|mov/.test(ext)
-                ? ' Firefox often can’t play AAC/M4A audio — try Chrome, or convert the file to MP3 or WAV first.'
-                : '';
-            showLoadError(`Couldn’t open "${mediaFile ? mediaFile.name : 'file'}" — ${reason}.${aacHint}`);
+            showLoadError(`Couldn’t open "${mediaFile ? mediaFile.name : 'file'}" — ${reason}. `
+                + 'Some codecs aren’t playable in every browser; try a different browser, or convert the file to a common format (e.g. MP4 or MP3) first.');
         }
 
         function onLoadedMeta() {
@@ -503,6 +536,8 @@
                 btn.textContent = FORMATS[key].label;
                 formatSel.appendChild(btn);
             });
+            // For video inputs, the audio formats extract just the soundtrack.
+            formatHint.hidden = mediaKind !== 'video';
         }
         formatSel.addEventListener('click', e => {
             const btn = e.target.closest('.opt-btn');
@@ -537,10 +572,10 @@
         });
 
         function updateFieldVisibility() {
-            const kind = FORMATS[format].kind;   // 'video' | 'gif' | 'audio'
-            resField.hidden     = !(kind === 'video' || kind === 'gif');
-            fpsField.hidden     = kind !== 'gif';
-            bitrateField.hidden = !(kind === 'audio' && format !== 'wav');
+            const f = FORMATS[format];
+            resField.hidden     = !(f.kind === 'video' || f.kind === 'gif');
+            fpsField.hidden     = f.kind !== 'gif';
+            bitrateField.hidden = !(f.kind === 'audio' && f.bitrate);
         }
 
         function updateWarning() {
@@ -596,25 +631,22 @@
         function buildArgs(inName, outName) {
             const ss = selStart.toFixed(3);
             const dur = (selEnd - selStart).toFixed(3);
-            const kind = FORMATS[format].kind;
+            const f = FORMATS[format];
             // Input seeking (-ss before -i) is fast and, because we always
             // re-encode, still frame-accurate.
             const args = ['-ss', ss, '-i', inName, '-t', dur];
 
-            if (kind === 'video') {
-                args.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart');
-                args.push('-c:a', 'aac', '-b:a', '128k');
+            if (f.kind === 'video') {
+                args.push(...f.codec);
                 if (resHeight) args.push('-vf', `scale=-2:${resHeight}`);
-            } else if (kind === 'gif') {
+            } else if (f.kind === 'gif') {
                 const scale = resHeight ? `,scale=-1:${resHeight}:flags=lanczos` : '';
                 args.push('-an', '-vf',
                     `fps=${gifFps}${scale},split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`,
                     '-loop', '0');
             } else { // audio
-                args.push('-vn');
-                if (format === 'mp3')      args.push('-c:a', 'libmp3lame', '-b:a', bitrate);
-                else if (format === 'm4a') args.push('-c:a', 'aac', '-b:a', bitrate);
-                else if (format === 'wav') args.push('-c:a', 'pcm_s16le');
+                args.push('-vn', ...f.codec);
+                if (f.bitrate) args.push('-b:a', bitrate);
             }
             args.push(outName);
             return args;

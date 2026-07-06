@@ -62,22 +62,23 @@ test.describe('video input', () => {
     await page.waitForFunction(() => !document.getElementById('editor').hidden);
   });
 
-  test('shows video formats and a size selector', async ({ page }) => {
+  test('shows video formats, audio-extraction options and a size selector', async ({ page }) => {
     const labels = await page.locator('#format-selector .opt-btn').allTextContents();
-    expect(labels.map((s) => s.trim())).toEqual(['MP4', 'GIF', 'MP3 (audio)', 'M4A (audio)']);
+    expect(labels.map((s) => s.trim())).toEqual(['MP4', 'GIF', 'MP3', 'M4A', 'AAC', 'OGG', 'FLAC', 'WAV']);
     await expect(page.locator('#res-field')).toBeVisible();
     await expect(page.locator('#bitrate-field')).toBeHidden();
+    await expect(page.locator('#format-hint')).toBeVisible();
   });
 
   test('audio-extraction formats reveal the quality selector', async ({ page }) => {
     await page.evaluate(() => [...document.querySelectorAll('#format-selector .opt-btn')]
-      .find((b) => b.textContent.trim() === 'M4A (audio)').click());
+      .find((b) => b.textContent.trim() === 'M4A').click());
     await expect(page.locator('#bitrate-field')).toBeVisible();
     await expect(page.locator('#res-field')).toBeHidden();
     await expect(page.locator('#fps-field')).toBeHidden();
   });
 
-  test('exports MP4, GIF, MP3 and M4A (engine reused across clips)', async ({ page }) => {
+  test('exports MP4, GIF and MP3 (engine reused across clips)', async ({ page }) => {
     await clip(page, 'MP4');
     await expect(page.locator('#download-link')).toHaveAttribute('download', /\.mp4$/);
     await expect(page.locator('#output-preview')).toBeVisible();
@@ -86,11 +87,8 @@ test.describe('video input', () => {
     await expect(page.locator('#download-link')).toHaveAttribute('download', /\.gif$/);
     await expect(page.locator('#output-gif')).toBeVisible();
 
-    await clip(page, 'MP3 (audio)');
+    await clip(page, 'MP3');
     await expect(page.locator('#download-link')).toHaveAttribute('download', /\.mp3$/);
-
-    await clip(page, 'M4A (audio)');
-    await expect(page.locator('#download-link')).toHaveAttribute('download', /\.m4a$/);
     expect(await page.locator('#download-link').getAttribute('href')).toMatch(/^blob:/);
   });
 
@@ -106,7 +104,7 @@ test.describe('video input', () => {
     await expect(page.locator('#t-start')).toHaveText('0:01.0');
     await expect(page.locator('#t-end')).toHaveText('0:02.0');
 
-    await clip(page, 'MP3 (audio)');
+    await clip(page, 'MP3');
     // Decode the output and confirm its real duration is ~1.0s.
     const dur = await page.evaluate(async () => {
       const a = new Audio();
@@ -130,20 +128,36 @@ test.describe('audio input', () => {
     await page.waitForFunction(() => !document.getElementById('editor').hidden);
   });
 
-  test('shows audio formats and a quality selector', async ({ page }) => {
+  test('shows every audio format and a quality selector', async ({ page }) => {
     await expect(page.locator('#preview')).toHaveClass(/audio-mode/);
     const labels = await page.locator('#format-selector .opt-btn').allTextContents();
-    expect(labels.map((s) => s.trim())).toEqual(['MP3 (audio)', 'M4A (audio)', 'WAV']);
+    expect(labels.map((s) => s.trim())).toEqual(['MP3', 'M4A', 'AAC', 'OGG', 'FLAC', 'WAV']);
     await expect(page.locator('#bitrate-field')).toBeVisible();
     await expect(page.locator('#res-field')).toBeHidden();
+    await expect(page.locator('#format-hint')).toBeHidden();
   });
 
-  test('exports WAV and M4A', async ({ page }) => {
-    await clip(page, 'WAV');
-    await expect(page.locator('#download-link')).toHaveAttribute('download', /\.wav$/);
+  // One case per audio encoder — this fails loudly if a codec isn't actually
+  // present in @ffmpeg/core, which is the real guard behind "support everything".
+  for (const [label, ext] of [
+    ['MP3', 'mp3'], ['M4A', 'm4a'], ['AAC', 'aac'],
+    ['OGG', 'ogg'], ['FLAC', 'flac'], ['WAV', 'wav'],
+  ]) {
+    test(`exports ${label}`, async ({ page }) => {
+      await clip(page, label);
+      await expect(page.locator('#download-link')).toHaveAttribute('download', new RegExp(`\\.${ext}$`));
+      expect(await page.locator('#download-link').getAttribute('href')).toMatch(/^blob:/);
+    });
+  }
 
-    await clip(page, 'M4A (audio)');
-    await expect(page.locator('#download-link')).toHaveAttribute('download', /\.m4a$/);
-    expect(await page.locator('#download-link').getAttribute('href')).toMatch(/^blob:/);
+  test('lossless formats hide the quality selector', async ({ page }) => {
+    for (const label of ['FLAC', 'WAV']) {
+      await page.evaluate((l) => [...document.querySelectorAll('#format-selector .opt-btn')]
+        .find((b) => b.textContent.trim() === l).click(), label);
+      await expect(page.locator('#bitrate-field')).toBeHidden();
+    }
+    await page.evaluate(() => [...document.querySelectorAll('#format-selector .opt-btn')]
+      .find((b) => b.textContent.trim() === 'MP3').click());
+    await expect(page.locator('#bitrate-field')).toBeVisible();
   });
 });
