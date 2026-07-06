@@ -36,6 +36,8 @@
             height: 3rem;
             background: #eff6ff;
         }
+        /* Higher specificity than #preview so the hidden attribute actually hides it. */
+        #preview[hidden] { display: none; }
         #file-name {
             font-size: 0.85rem; color: #6b7280;
             margin: 0.5rem 0 0; overflow: hidden;
@@ -274,6 +276,15 @@
         let coreBlobs = null;             // cached blob URLs for the engine
         let outputUrls = [];
 
+        // Web Audio fallback — used when the media element can't decode the file
+        // (e.g. iPad Safari refuses blob-URL media). We decode the bytes with
+        // decodeAudioData and play the selection through Web Audio instead.
+        let webAudioMode = false;
+        let audioCtx = null;
+        let audioBuffer = null;
+        let waSource = null, waStartCtxTime = 0, waStartOffset = 0, waPlayhead = 0, waRaf = 0;
+        const FORCE_WEBAUDIO = new URLSearchParams(location.search).get('audioengine') === 'webaudio';
+
         const trackUrl = u => { outputUrls.push(u); return u; };
         const revokeOutputs = () => { outputUrls.forEach(u => URL.revokeObjectURL(u)); outputUrls = []; };
 
@@ -390,6 +401,19 @@
             outputPreview.hidden = true;
             outputGif.hidden = true;
             statusMsg.hidden = true;
+            stopWebAudio();
+            webAudioMode = false;
+            audioBuffer = null;
+            waPlayhead = 0;
+            preview.hidden = false;
+            fileNameEl.textContent = file.name;
+
+            // Some browsers (notably iPad Safari) can't decode certain files via a
+            // media element; for audio we can skip straight to the Web Audio path.
+            if (kind === 'audio' && FORCE_WEBAUDIO) {
+                tryWebAudioFallback();
+                return;
+            }
 
             // Safari won't decode a blob URL whose Blob has no MIME type, which is
             // exactly what a typeless .m4a produces. Re-tag it from the extension so
@@ -405,7 +429,6 @@
             preview.addEventListener('error', onMediaError);
             preview.src = url;
             preview.classList.toggle('audio-mode', mediaKind === 'audio');
-            fileNameEl.textContent = file.name;
         }
 
         function detachLoadHandlers() {
@@ -413,15 +436,46 @@
             preview.removeEventListener('error', onMediaError);
         }
 
-        // Fires when the browser can't load/decode the picked file — the case
-        // that used to fail silently (e.g. AAC/M4A in Firefox).
+        // Fires when the browser can't load/decode the picked file via the media
+        // element (e.g. iPad Safari refusing blob-URL media). For audio we retry
+        // with Web Audio, which decodes from bytes and avoids the blob path.
         function onMediaError() {
             detachLoadHandlers();
             const err = preview.error;
             const reason = err ? (MEDIA_ERR[err.code] || `error ${err.code}`) : 'unknown error';
-            console.error(LOG, 'media load failed', { code: err && err.code, message: err && err.message, file: mediaFile && mediaFile.name });
+            console.error(LOG, 'media element load failed', { code: err && err.code, message: err && err.message, file: mediaFile && mediaFile.name });
+            if (mediaKind === 'audio') {
+                tryWebAudioFallback();
+                return;
+            }
             showLoadError(`Couldn’t open "${mediaFile ? mediaFile.name : 'file'}" — ${reason}. `
                 + 'Some codecs aren’t playable in every browser; try a different browser, or convert the file to a common format (e.g. MP4 or MP3) first.');
+        }
+
+        // Decode the audio in memory and build the editor without the media
+        // element. Playback happens through Web Audio (see playWebAudioSelection);
+        // the actual clip is still produced by ffmpeg from the original bytes.
+        async function tryWebAudioFallback() {
+            console.log(LOG, 'trying Web Audio fallback');
+            try {
+                audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+                const bytes = await mediaFile.arrayBuffer();
+                audioBuffer = await new Promise((res, rej) => {
+                    // Safari historically only supports the callback form.
+                    const p = audioCtx.decodeAudioData(bytes, res, rej);
+                    if (p && typeof p.then === 'function') p.then(res, rej);
+                });
+                duration = audioBuffer.duration;
+                webAudioMode = true;
+                preview.hidden = true;            // the element can't play this file
+                clearLoadError();
+                console.log(LOG, 'Web Audio fallback OK', { duration });
+                finishLoad();
+            } catch (e) {
+                console.error(LOG, 'Web Audio decode failed', e && (e.message || e));
+                showLoadError(`Couldn’t open "${mediaFile ? mediaFile.name : 'file'}" — this browser can’t decode it. `
+                    + 'Try converting it to MP3 or WAV first.');
+            }
         }
 
         function onLoadedMeta() {
@@ -467,9 +521,26 @@
             tEndEl.textContent = fmtTime(selEnd);
             updatePlayhead();
         }
+        // Current playhead position, abstracted over the two playback engines.
+        function getTime() {
+            if (webAudioMode) {
+                if (playingSelection && waSource) {
+                    return Math.min(selEnd, waStartOffset + (audioCtx.currentTime - waStartCtxTime));
+                }
+                return waPlayhead;
+            }
+            return preview.currentTime;
+        }
+        function seekTo(t) {
+            t = clamp(t, 0, duration);
+            if (webAudioMode) { stopWebAudio(); waPlayhead = t; }
+            else { preview.currentTime = t; }
+            updatePlayhead();
+        }
         function updatePlayhead() {
-            tlPlayhead.style.left = pctOf(preview.currentTime) + '%';
-            tCurrentEl.textContent = fmtTime(preview.currentTime);
+            const t = getTime();
+            tlPlayhead.style.left = pctOf(t) + '%';
+            tCurrentEl.textContent = fmtTime(t);
         }
 
         preview.addEventListener('timeupdate', () => {
@@ -479,6 +550,33 @@
                 playingSelection = false;
             }
         });
+
+        function stopWebAudio() {
+            if (waSource) { try { waSource.onended = null; waSource.stop(); } catch {} waSource = null; }
+            if (waRaf) { cancelAnimationFrame(waRaf); waRaf = 0; }
+            playingSelection = false;
+        }
+        function playWebAudioSelection() {
+            if (!audioBuffer) return;
+            stopWebAudio();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const src = audioCtx.createBufferSource();
+            src.buffer = audioBuffer;
+            src.connect(audioCtx.destination);
+            waStartOffset = selStart;
+            waStartCtxTime = audioCtx.currentTime;
+            src.start(0, selStart, Math.max(0, selEnd - selStart));
+            waSource = src;
+            playingSelection = true;
+            src.onended = () => { if (waSource === src) { stopWebAudio(); waPlayhead = selEnd; updatePlayhead(); } };
+            const tick = () => {
+                if (!playingSelection) return;
+                if (getTime() >= selEnd) { stopWebAudio(); waPlayhead = selEnd; updatePlayhead(); return; }
+                updatePlayhead();
+                waRaf = requestAnimationFrame(tick);
+            };
+            waRaf = requestAnimationFrame(tick);
+        }
 
         // Drag handles + click-to-seek
         let dragging = null; // 'start' | 'end' | null
@@ -491,9 +589,7 @@
         hEnd.addEventListener('pointerdown',   e => { dragging = 'end';   timeline.setPointerCapture(e.pointerId); e.preventDefault(); });
         timeline.addEventListener('pointerdown', e => {
             if (dragging) return;                 // started on a handle
-            const t = timeAtClientX(e.clientX);
-            preview.currentTime = t;              // click empty track → seek
-            updatePlayhead();
+            seekTo(timeAtClientX(e.clientX));     // click empty track → seek
         });
         timeline.addEventListener('pointermove', e => {
             if (!dragging) return;
@@ -510,16 +606,17 @@
         // ---- Selection controls -------------------------------------------------
         let playingSelection = false;
         playSelBtn.addEventListener('click', () => {
+            if (webAudioMode) { playWebAudioSelection(); return; }
             preview.currentTime = selStart;
             playingSelection = true;
             preview.play();
         });
         setStartBtn.addEventListener('click', () => {
-            selStart = clamp(preview.currentTime, 0, selEnd - 0.1);
+            selStart = clamp(getTime(), 0, selEnd - 0.1);
             renderTimeline(); updateWarning();
         });
         setEndBtn.addEventListener('click', () => {
-            selEnd = clamp(preview.currentTime, selStart + 0.1, duration);
+            selEnd = clamp(getTime(), selStart + 0.1, duration);
             renderTimeline(); updateWarning();
         });
 

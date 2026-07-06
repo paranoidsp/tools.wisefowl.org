@@ -92,4 +92,27 @@ async function attachMedia(page, { video = true, ms = 2500, inputSel = '#file-in
   }, { video, ms, inputSel, name, type });
 }
 
-module.exports = { attachImages, attachPdf, attachMedia };
+// Attach a real PCM WAV built in-page. Unlike MediaRecorder output, a WAV is
+// decodable by Web Audio's decodeAudioData in every browser, so it's used to
+// exercise the Web Audio fallback path.
+async function attachWav(page, { name = 'tone.wav', type = 'audio/wav', seconds = 2, freq = 440, inputSel = '#file-input' } = {}) {
+  await page.evaluate(({ name, type, seconds, freq, inputSel }) => {
+    const sr = 44100;
+    const n = Math.floor(seconds * sr);
+    const buf = new ArrayBuffer(44 + n * 2);
+    const dv = new DataView(buf);
+    const ws = (off, s) => { for (let i = 0; i < s.length; i++) dv.setUint8(off + i, s.charCodeAt(i)); };
+    ws(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); ws(8, 'WAVE');
+    ws(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+    dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+    ws(36, 'data'); dv.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) dv.setInt16(44 + i * 2, Math.sin(2 * Math.PI * freq * i / sr) * 0.3 * 32767, true);
+    const dt = new DataTransfer();
+    dt.items.add(new File([buf], name, { type }));
+    const input = document.querySelector(inputSel);
+    input.files = dt.files;
+    input.dispatchEvent(new Event('change'));
+  }, { name, type, seconds, freq, inputSel });
+}
+
+module.exports = { attachImages, attachPdf, attachMedia, attachWav };

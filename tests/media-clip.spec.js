@@ -1,5 +1,5 @@
 const { test, expect } = require('./helpers/fixtures');
-const { attachMedia } = require('./helpers/gen');
+const { attachMedia, attachWav } = require('./helpers/gen');
 
 // Click the format button whose label matches, and wait for a finished clip
 // (output section) or a surfaced error.
@@ -159,5 +159,30 @@ test.describe('audio input', () => {
     await page.evaluate(() => [...document.querySelectorAll('#format-selector .opt-btn')]
       .find((b) => b.textContent.trim() === 'MP3').click());
     await expect(page.locator('#bitrate-field')).toBeVisible();
+  });
+});
+
+// ?audioengine=webaudio forces the fallback that iPad Safari needs, so we can
+// exercise it in Chromium: decode with Web Audio, build the editor without a
+// working media element, and still clip via ffmpeg from the original bytes.
+test.describe('web audio fallback', () => {
+  test('decodes, builds the editor, and clips without the media element', async ({ page }) => {
+    await page.goto('/media-clip.html?audioengine=webaudio');
+    await attachWav(page, { name: 'tone.wav', type: 'audio/wav', seconds: 2 });
+    await page.waitForFunction(() => !document.getElementById('editor').hidden, { timeout: 30_000 });
+
+    // The media element is hidden (it couldn't play the file), but we still have
+    // a real duration and audio format options.
+    await expect(page.locator('#preview')).toBeHidden();
+    await expect(page.locator('#t-end')).toHaveText('0:02.0');
+    await expect(page.locator('#load-error')).toBeHidden();
+
+    // Playing the selection through Web Audio must not throw.
+    await page.click('#play-sel');
+
+    // The clip is produced by ffmpeg from the original bytes, independent of preview.
+    await clip(page, 'MP3');
+    await expect(page.locator('#download-link')).toHaveAttribute('download', /\.mp3$/);
+    expect(await page.locator('#download-link').getAttribute('href')).toMatch(/^blob:/);
   });
 });
