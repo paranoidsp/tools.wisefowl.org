@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Merge — Wisefowl Tools</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦆</text></svg>">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        #drop-zone {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            margin: 1.5rem 0;
+            color: #6b7280;
+        }
+        #drop-zone.drag-over { border-color: #2563eb; background: #eff6ff; }
+        #drop-zone p { margin: 0.25rem 0; }
+        #drop-zone .hint { font-size: 0.9rem; }
+        #browse-btn {
+            background: none; border: none; color: #2563eb; cursor: pointer;
+            font-size: inherit; padding: 0; text-decoration: underline;
+        }
+
+        #queue-list { list-style: none; padding: 0; margin: 0.5rem 0 1rem; }
+        #queue-list li {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f3f4f6;
+            font-size: 0.9rem;
+        }
+        #queue-list li .idx { color: #9ca3af; font-variant-numeric: tabular-nums; width: 1.5rem; }
+        #queue-list li .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #queue-list li .meta { color: #9ca3af; font-size: 0.8rem; white-space: nowrap; }
+        .queue-btn {
+            background: none;
+            border: 1px solid #e5e7eb;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 0.1rem 0.35rem;
+            color: #6b7280;
+        }
+        .queue-btn:hover { border-color: #9ca3af; color: #1a1a1a; }
+        .queue-btn.remove:hover { border-color: #fca5a5; color: #dc2626; }
+        .queue-btn:disabled { opacity: 0.3; cursor: default; }
+
+        .field-label { font-size: 0.85rem; color: #6b7280; margin: 1rem 0 0.4rem; }
+        .selector { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .opt-btn {
+            flex: 1; min-width: 4rem; padding: 0.4rem;
+            border: 1px solid #e5e7eb; border-radius: 4px; background: white;
+            cursor: pointer; font-size: 0.9rem; color: #6b7280; white-space: nowrap;
+        }
+        .opt-btn.active { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+
+        #merge-btn {
+            margin-top: 1.25rem;
+            padding: 0.6rem 1.5rem;
+            background: #2563eb; color: white; border: none;
+            border-radius: 5px; font-size: 1rem; cursor: pointer;
+        }
+        #merge-btn:hover { background: #1d4ed8; }
+        #merge-btn:disabled { background: #93c5fd; cursor: not-allowed; }
+
+        #status-msg { color: #6b7280; font-size: 0.9rem; margin-top: 0.75rem; }
+        #load-error {
+            color: #dc2626; font-size: 0.9rem;
+            background: #fef2f2; border: 1px solid #fecaca;
+            border-radius: 4px; padding: 0.6rem 0.75rem; margin: 1rem 0;
+        }
+        .note { font-size: 0.82rem; color: #9ca3af; margin: 0.5rem 0 0; }
+
+        #output-row { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0; flex-wrap: wrap; }
+        #output-size { color: #16a34a; font-size: 0.9rem; }
+        #output-audio { width: 100%; margin-top: 0.5rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>Audio Merge</h1>
+            <p class="subtitle">Join several audio files into one, in the order you choose. Export as MP3, M4A, AAC, OGG, FLAC or WAV. Files never leave your device.</p>
+        </div>
+        <a class="private-link" href="/">← Tools</a>
+    </header>
+
+    <div id="drop-zone">
+        <p>Drop audio files here</p>
+        <p class="hint">or <button id="browse-btn" type="button">browse files</button></p>
+        <input type="file" id="file-input" accept="audio/*,.m4a,.mp3,.aac,.wav,.ogg,.oga,.opus,.flac,.weba,.aiff,.aif,.wma" multiple hidden>
+    </div>
+    <p id="load-error" hidden></p>
+
+    <section id="queue-section" hidden>
+        <h2>Files <span id="queue-summary" style="color:#9ca3af;font-weight:normal;font-size:0.9rem;"></span></h2>
+        <ul id="queue-list"></ul>
+        <p class="note">They merge top to bottom — reorder with ↑ ↓.</p>
+
+        <p class="field-label">Format</p>
+        <div class="selector" id="format-selector"></div>
+
+        <div id="bitrate-field" hidden>
+            <p class="field-label">Quality</p>
+            <div class="selector" id="bitrate-selector">
+                <button class="opt-btn" data-br="96k" type="button">Low</button>
+                <button class="opt-btn active" data-br="160k" type="button">Medium</button>
+                <button class="opt-btn" data-br="256k" type="button">High</button>
+            </div>
+        </div>
+
+        <button id="merge-btn" type="button">Merge</button>
+        <div id="status-msg" hidden></div>
+        <p class="note">First merge loads the audio engine (~32&nbsp;MB) — later merges are instant. Everything runs locally in your browser.</p>
+    </section>
+
+    <section id="output-section" hidden>
+        <h2>Output</h2>
+        <div id="output-row">
+            <span class="filename-field">
+                <input id="filename-input" class="filename-input" type="text" spellcheck="false" autocomplete="off" aria-label="Output file name">
+                <span id="filename-ext" class="filename-ext"></span>
+            </span>
+            <a id="download-link" class="download-btn" href="#" download>Download</a>
+            <span id="output-size"></span>
+        </div>
+        <audio id="output-audio" controls playsinline hidden></audio>
+    </section>
+
+    <footer>
+        <a href="/changelog.html">changelog</a> &middot;
+        <a href="https://en.wikipedia.org/wiki/Existentialism">wisefowl.org</a>
+    </footer>
+
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+    <script>
+        // ---- Format registry ----------------------------------------------------
+        // Output audio formats, shared in spirit with the Media Clipper. Each entry
+        // declares the encoder args and whether it's lossy (shows the quality
+        // selector). We expose what @ffmpeg/core reliably encodes.
+        const FORMATS = {
+            mp3:  { label: 'MP3',  ext: 'mp3',  mime: 'audio/mpeg', bitrate: true,  codec: ['-c:a', 'libmp3lame'] },
+            m4a:  { label: 'M4A',  ext: 'm4a',  mime: 'audio/mp4',  bitrate: true,  codec: ['-c:a', 'aac'] },
+            aac:  { label: 'AAC',  ext: 'aac',  mime: 'audio/aac',  bitrate: true,  codec: ['-c:a', 'aac'] },
+            ogg:  { label: 'OGG',  ext: 'ogg',  mime: 'audio/ogg',  bitrate: true,  codec: ['-c:a', 'libvorbis'] },
+            flac: { label: 'FLAC', ext: 'flac', mime: 'audio/flac', bitrate: false, codec: ['-c:a', 'flac'] },
+            wav:  { label: 'WAV',  ext: 'wav',  mime: 'audio/wav',  bitrate: false, codec: ['-c:a', 'pcm_s16le'] },
+        };
+        const FORMAT_KEYS = ['mp3', 'm4a', 'aac', 'ogg', 'flac', 'wav'];
+
+        // ---- State --------------------------------------------------------------
+        let queue = [];
+        let nextId = 0;
+        let format = 'mp3';
+        let bitrate = '160k';
+        let ffmpeg = null;
+        let coreBlobs = null;
+        let outputUrls = [];
+
+        const trackUrl = u => { outputUrls.push(u); return u; };
+        const revokeOutputs = () => { outputUrls.forEach(u => URL.revokeObjectURL(u)); outputUrls = []; };
+
+        // ---- Elements -----------------------------------------------------------
+        const dropZone      = document.getElementById('drop-zone');
+        const fileInput     = document.getElementById('file-input');
+        const browseBtn     = document.getElementById('browse-btn');
+        const queueSection  = document.getElementById('queue-section');
+        const queueList     = document.getElementById('queue-list');
+        const queueSummary  = document.getElementById('queue-summary');
+        const formatSel     = document.getElementById('format-selector');
+        const bitrateField  = document.getElementById('bitrate-field');
+        const mergeBtn      = document.getElementById('merge-btn');
+        const statusMsg     = document.getElementById('status-msg');
+        const outputSection = document.getElementById('output-section');
+        const downloadLink  = document.getElementById('download-link');
+        const filenameInput = document.getElementById('filename-input');
+        const filenameExt   = document.getElementById('filename-ext');
+        const outputSizeEl  = document.getElementById('output-size');
+        const outputAudio   = document.getElementById('output-audio');
+        const loadError     = document.getElementById('load-error');
+
+        const LOG = '[audio-merge]';
+        function showLoadError(msg) { loadError.textContent = msg; loadError.hidden = false; console.error(LOG, msg); }
+        function clearLoadError() { loadError.hidden = true; loadError.textContent = ''; }
+
+        // Editable output filename. The base is user-editable; the extension is
+        // fixed so it can't be broken. The <a download> updates as they type.
+        function sanitizeBase(s) {
+            return s.replace(/[\/\\:*?"<>|\x00-\x1f]/g, '').replace(/\.+$/, '').trim();
+        }
+        function applyDownloadName() {
+            const base = sanitizeBase(filenameInput.value) || 'merged';
+            downloadLink.download = base + filenameExt.textContent;
+        }
+        filenameInput.addEventListener('input', applyDownloadName);
+        function setDownload(base, ext, href) {
+            filenameInput.value = base;
+            filenameExt.textContent = '.' + ext;
+            downloadLink.href = href;
+            applyDownloadName();
+        }
+
+        // ---- Classification -----------------------------------------------------
+        // Audio files (notably .m4a) often report an empty or odd MIME type, so
+        // fall back to the extension when the type isn't clearly audio.
+        const AUDIO_EXT = new Set(['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba', 'aiff', 'aif', 'wma', 'webm']);
+        const extOf = name => (name.toLowerCase().match(/\.([a-z0-9]+)$/) || [, ''])[1];
+        function isAudio(file) {
+            const type = file.type || '';
+            if (type.startsWith('audio/')) return true;
+            // A webm/ogg container can be audio-only; trust the extension list.
+            return AUDIO_EXT.has(extOf(file.name));
+        }
+
+        // ---- File input ---------------------------------------------------------
+        dropZone.addEventListener('click', () => fileInput.click());
+        browseBtn.addEventListener('click', e => { e.stopPropagation(); fileInput.click(); });
+        dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            addFiles([...e.dataTransfer.files]);
+        });
+        fileInput.addEventListener('change', () => {
+            addFiles([...fileInput.files]);
+            fileInput.value = '';
+        });
+
+        function addFiles(files) {
+            clearLoadError();
+            let skipped = 0;
+            for (const file of files) {
+                if (!isAudio(file)) {
+                    console.warn(LOG, 'skipping non-audio file', file.name, file.type || '(empty)');
+                    skipped++;
+                    continue;
+                }
+                queue.push({ id: nextId++, file, name: file.name });
+            }
+            if (skipped) {
+                showLoadError(`Skipped ${skipped} file${skipped !== 1 ? 's' : ''} that ${skipped !== 1 ? "aren't" : "isn't"} audio. Add audio files such as MP3, M4A, WAV, AAC, OGG or FLAC.`);
+            }
+            renderQueue();
+        }
+
+        function moveItem(id, dir) {
+            const i = queue.findIndex(x => x.id === id);
+            const j = i + dir;
+            if (j < 0 || j >= queue.length) return;
+            [queue[i], queue[j]] = [queue[j], queue[i]];
+            renderQueue();
+        }
+        function removeItem(id) {
+            queue = queue.filter(x => x.id !== id);
+            renderQueue();
+        }
+
+        function fmtSize(bytes) {
+            return bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+        }
+
+        function renderQueue() {
+            queueSection.hidden = queue.length === 0;
+            outputSection.hidden = true;
+            revokeOutputs();
+
+            queueSummary.textContent = `(${queue.length} file${queue.length !== 1 ? 's' : ''})`;
+            mergeBtn.disabled = queue.length === 0;
+            mergeBtn.textContent = queue.length > 1 ? `Merge ${queue.length} files` : 'Merge';
+
+            queueList.innerHTML = '';
+            queue.forEach((item, i) => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span class="idx">${i + 1}</span>
+                    <span class="name" title="${item.name}">${item.name}</span>
+                    <span class="meta">${fmtSize(item.file.size)}</span>
+                    <button class="queue-btn" data-action="up" data-id="${item.id}" ${i === 0 ? 'disabled' : ''}>↑</button>
+                    <button class="queue-btn" data-action="down" data-id="${item.id}" ${i === queue.length - 1 ? 'disabled' : ''}>↓</button>
+                    <button class="queue-btn remove" data-action="remove" data-id="${item.id}">✕</button>
+                `;
+                queueList.appendChild(li);
+            });
+        }
+
+        queueList.addEventListener('click', e => {
+            const btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            const id = +btn.dataset.id;
+            if (btn.dataset.action === 'up')     moveItem(id, -1);
+            if (btn.dataset.action === 'down')   moveItem(id, +1);
+            if (btn.dataset.action === 'remove') removeItem(id);
+        });
+
+        // ---- Format / quality options -------------------------------------------
+        function buildFormatOptions() {
+            formatSel.innerHTML = '';
+            FORMAT_KEYS.forEach((key, i) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'opt-btn' + (key === format ? ' active' : '');
+                btn.dataset.fmt = key;
+                btn.textContent = FORMATS[key].label;
+                formatSel.appendChild(btn);
+            });
+            updateFieldVisibility();
+        }
+        formatSel.addEventListener('click', e => {
+            const btn = e.target.closest('.opt-btn');
+            if (!btn) return;
+            formatSel.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            format = btn.dataset.fmt;
+            updateFieldVisibility();
+        });
+        document.getElementById('bitrate-selector').addEventListener('click', e => {
+            const btn = e.target.closest('.opt-btn');
+            if (!btn) return;
+            e.currentTarget.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            bitrate = btn.dataset.br;
+        });
+        function updateFieldVisibility() {
+            bitrateField.hidden = !FORMATS[format].bitrate;
+        }
+        buildFormatOptions();
+
+        // ---- FFmpeg -------------------------------------------------------------
+        // The worker chunk is the UMD build; the core must be the ESM build so the
+        // module worker can `import()` it (UMD has no default export). Blob URLs are
+        // cached so recovering from a crash re-instantiates without re-downloading.
+        const FF_UMD   = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd';
+        const CORE_ESM = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+
+        async function ensureFFmpeg() {
+            if (ffmpeg) return ffmpeg;
+            const { FFmpeg } = FFmpegWASM;
+            const { toBlobURL } = FFmpegUtil;
+            if (!coreBlobs) {
+                statusMsg.textContent = 'Loading audio engine (~32 MB, first time only)…';
+                coreBlobs = {
+                    classWorkerURL: await toBlobURL(`${FF_UMD}/814.ffmpeg.js`, 'text/javascript'),
+                    coreURL: await toBlobURL(`${CORE_ESM}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${CORE_ESM}/ffmpeg-core.wasm`, 'application/wasm'),
+                };
+            }
+            const ff = new FFmpeg();
+            ff.on('progress', ({ progress }) => {
+                if (progress >= 0 && progress <= 1) {
+                    statusMsg.textContent = `Merging… ${Math.round(progress * 100)}%`;
+                }
+            });
+            await ff.load(coreBlobs);
+            ffmpeg = ff;
+            return ffmpeg;
+        }
+
+        function resetFFmpeg() {
+            try { ffmpeg && ffmpeg.terminate(); } catch {}
+            ffmpeg = null;
+        }
+
+        // Concatenate with the concat filter. Inputs may have different codecs,
+        // sample rates and channel counts, so aformat normalizes each stream to a
+        // common layout first — otherwise concat refuses mismatched streams.
+        function buildArgs(inNames, outName) {
+            const f = FORMATS[format];
+            const args = [];
+            inNames.forEach(n => args.push('-i', n));
+            const norm = inNames.map((_, i) => `[${i}:a]aformat=sample_rates=44100:channel_layouts=stereo[a${i}]`).join(';');
+            const chain = inNames.map((_, i) => `[a${i}]`).join('');
+            const filter = `${norm};${chain}concat=n=${inNames.length}:v=0:a=1[out]`;
+            args.push('-filter_complex', filter, '-map', '[out]', ...f.codec);
+            if (f.bitrate) args.push('-b:a', bitrate);
+            args.push(outName);
+            return args;
+        }
+
+        // ---- Merge --------------------------------------------------------------
+        mergeBtn.addEventListener('click', async () => {
+            if (queue.length === 0) return;
+            const { fetchFile } = FFmpegUtil;
+            const f = FORMATS[format];
+
+            mergeBtn.disabled = true;
+            statusMsg.hidden = false;
+            outputSection.hidden = true;
+            outputAudio.hidden = true;
+
+            const inNames = [];
+            try {
+                const ff = await ensureFFmpeg();
+                const outName = 'merged.' + f.ext;
+
+                statusMsg.textContent = 'Reading files…';
+                for (let i = 0; i < queue.length; i++) {
+                    const ext = extOf(queue[i].name) || 'dat';
+                    const inName = `in${i}.${ext}`;
+                    await ff.writeFile(inName, await fetchFile(queue[i].file));
+                    inNames.push(inName);
+                }
+
+                statusMsg.textContent = 'Merging…';
+                await ff.exec(buildArgs(inNames, outName));
+
+                const data = await ff.readFile(outName);
+                const blob = new Blob([data.buffer], { type: f.mime });
+                const url = trackUrl(URL.createObjectURL(blob));
+
+                setDownload('merged', f.ext, url);
+                outputSizeEl.textContent = fmtSize(blob.size);
+                outputAudio.src = url;
+                outputAudio.hidden = false;
+
+                try {
+                    for (const n of inNames) await ff.deleteFile(n);
+                    await ff.deleteFile(outName);
+                } catch {}
+
+                outputSection.hidden = false;
+                statusMsg.hidden = true;
+            } catch (err) {
+                const msg = err && err.message ? err.message : String(err);
+                console.error(LOG, 'merge failed', msg);
+                statusMsg.textContent = /memory access|out of bounds|abort/i.test(msg)
+                    ? 'Ran out of memory merging these files. Try fewer or shorter files, or a smaller output format, then merge again.'
+                    : `Error: ${msg}`;
+                resetFFmpeg();   // instance is dead after a trap — rebuild next time
+            } finally {
+                mergeBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
