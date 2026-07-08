@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio to Video — Wisefowl Tools</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦆</text></svg>">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .slots { display: flex; gap: 1rem; margin: 1.5rem 0; flex-wrap: wrap; }
+        .slot {
+            flex: 1; min-width: 13rem;
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 1.5rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            color: #6b7280;
+        }
+        .slot.drag-over { border-color: #2563eb; background: #eff6ff; }
+        .slot.filled { border-style: solid; border-color: #bfdbfe; cursor: default; }
+        .slot h3 { font-size: 0.95rem; margin-bottom: 0.5rem; color: #1a1a1a; }
+        .slot p { margin: 0.25rem 0; font-size: 0.9rem; }
+        .slot .browse {
+            background: none; border: none; color: #2563eb; cursor: pointer;
+            font-size: inherit; padding: 0; text-decoration: underline;
+        }
+        .slot .thumb { max-width: 100%; max-height: 8rem; border-radius: 5px; margin: 0.25rem auto 0.5rem; display: block; }
+        .slot .picked { color: #1a1a1a; font-size: 0.9rem; word-break: break-word; }
+        .slot .change { display: inline-block; margin-top: 0.4rem; font-size: 0.8rem; color: #6b7280; }
+
+        .field-label { font-size: 0.85rem; color: #6b7280; margin: 1rem 0 0.4rem; }
+        .selector { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .opt-btn {
+            flex: 1; min-width: 4rem; padding: 0.4rem;
+            border: 1px solid #e5e7eb; border-radius: 4px; background: white;
+            cursor: pointer; font-size: 0.9rem; color: #6b7280; white-space: nowrap;
+        }
+        .opt-btn.active { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+
+        #make-btn {
+            margin-top: 1.25rem;
+            padding: 0.6rem 1.5rem;
+            background: #2563eb; color: white; border: none;
+            border-radius: 5px; font-size: 1rem; cursor: pointer;
+        }
+        #make-btn:hover { background: #1d4ed8; }
+        #make-btn:disabled { background: #93c5fd; cursor: not-allowed; }
+
+        #status-msg { color: #6b7280; font-size: 0.9rem; margin-top: 0.75rem; }
+        #load-error {
+            color: #dc2626; font-size: 0.9rem;
+            background: #fef2f2; border: 1px solid #fecaca;
+            border-radius: 4px; padding: 0.6rem 0.75rem; margin: 1rem 0;
+        }
+        .note { font-size: 0.82rem; color: #9ca3af; margin: 0.5rem 0 0; }
+
+        #output-row { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0; flex-wrap: wrap; }
+        #output-size { color: #16a34a; font-size: 0.9rem; }
+        #output-video { width: 100%; max-height: 45vh; background: #1a1a1a; border-radius: 6px; margin-top: 0.5rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>Audio to Video</h1>
+            <p class="subtitle">Turn an audio track into a video by showing a still image for its full length. Exports MP4. Files never leave your device.</p>
+        </div>
+        <a class="private-link" href="/">← Tools</a>
+    </header>
+
+    <div class="slots">
+        <div class="slot" id="image-slot">
+            <h3>🖼 Image</h3>
+            <div id="image-empty">
+                <p>Drop an image here</p>
+                <p class="hint">or <button class="browse" id="image-browse" type="button">browse</button></p>
+            </div>
+            <div id="image-filled" hidden>
+                <img id="image-thumb" class="thumb" alt="chosen image">
+                <div class="picked" id="image-name"></div>
+                <button class="browse change" id="image-change" type="button">change</button>
+            </div>
+            <input type="file" id="image-input" accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp" hidden>
+        </div>
+
+        <div class="slot" id="audio-slot">
+            <h3>🎵 Audio</h3>
+            <div id="audio-empty">
+                <p>Drop an audio file here</p>
+                <p class="hint">or <button class="browse" id="audio-browse" type="button">browse</button></p>
+            </div>
+            <div id="audio-filled" hidden>
+                <div class="picked" id="audio-name"></div>
+                <button class="browse change" id="audio-change" type="button">change</button>
+            </div>
+            <input type="file" id="audio-input" accept="audio/*,.m4a,.mp3,.aac,.wav,.ogg,.oga,.opus,.flac,.weba" hidden>
+        </div>
+    </div>
+    <p id="load-error" hidden></p>
+
+    <section id="options" hidden>
+        <p class="field-label">Size</p>
+        <div class="selector" id="res-selector">
+            <button class="opt-btn active" data-h="0" type="button">Original</button>
+            <button class="opt-btn" data-h="1080" type="button">1080p</button>
+            <button class="opt-btn" data-h="720" type="button">720p</button>
+            <button class="opt-btn" data-h="480" type="button">480p</button>
+        </div>
+
+        <button id="make-btn" type="button" disabled>Create video</button>
+        <div id="status-msg" hidden></div>
+        <p class="note">First run loads the video engine (~32&nbsp;MB) — later runs are instant. Everything runs locally in your browser.</p>
+    </section>
+
+    <section id="output-section" hidden>
+        <h2>Output</h2>
+        <div id="output-row">
+            <span class="filename-field">
+                <input id="filename-input" class="filename-input" type="text" spellcheck="false" autocomplete="off" aria-label="Output file name">
+                <span id="filename-ext" class="filename-ext"></span>
+            </span>
+            <a id="download-link" class="download-btn" href="#" download>Download</a>
+            <span id="output-size"></span>
+        </div>
+        <video id="output-video" controls playsinline hidden></video>
+    </section>
+
+    <footer>
+        <a href="/changelog.html">changelog</a> &middot;
+        <a href="https://en.wikipedia.org/wiki/Existentialism">wisefowl.org</a>
+    </footer>
+
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+    <script>
+        // ---- State --------------------------------------------------------------
+        let imageFile = null;
+        let audioFile = null;
+        let resHeight = 0;               // 0 = original (evened) image size
+        let ffmpeg = null;
+        let coreBlobs = null;
+        let outputUrls = [];
+
+        const trackUrl = u => { outputUrls.push(u); return u; };
+        const revokeOutputs = () => { outputUrls.forEach(u => URL.revokeObjectURL(u)); outputUrls = []; };
+
+        // ---- Elements -----------------------------------------------------------
+        const imageSlot   = document.getElementById('image-slot');
+        const audioSlot   = document.getElementById('audio-slot');
+        const imageInput  = document.getElementById('image-input');
+        const audioInput  = document.getElementById('audio-input');
+        const imageEmpty  = document.getElementById('image-empty');
+        const imageFilled = document.getElementById('image-filled');
+        const imageThumb  = document.getElementById('image-thumb');
+        const imageNameEl = document.getElementById('image-name');
+        const audioEmpty  = document.getElementById('audio-empty');
+        const audioFilled = document.getElementById('audio-filled');
+        const audioNameEl = document.getElementById('audio-name');
+        const optionsSec  = document.getElementById('options');
+        const makeBtn     = document.getElementById('make-btn');
+        const statusMsg   = document.getElementById('status-msg');
+        const outputSection = document.getElementById('output-section');
+        const downloadLink  = document.getElementById('download-link');
+        const filenameInput = document.getElementById('filename-input');
+        const filenameExt   = document.getElementById('filename-ext');
+        const outputSizeEl  = document.getElementById('output-size');
+        const outputVideo   = document.getElementById('output-video');
+        const loadError     = document.getElementById('load-error');
+
+        const LOG = '[audio-video]';
+        function showLoadError(msg) { loadError.textContent = msg; loadError.hidden = false; console.error(LOG, msg); }
+        function clearLoadError() { loadError.hidden = true; loadError.textContent = ''; }
+
+        // Editable output filename. Base editable; extension locked.
+        function sanitizeBase(s) {
+            return s.replace(/[\/\\:*?"<>|\x00-\x1f]/g, '').replace(/\.+$/, '').trim();
+        }
+        function applyDownloadName() {
+            const base = sanitizeBase(filenameInput.value) || 'video';
+            downloadLink.download = base + filenameExt.textContent;
+        }
+        filenameInput.addEventListener('input', applyDownloadName);
+        function setDownload(base, ext, href) {
+            filenameInput.value = base;
+            filenameExt.textContent = '.' + ext;
+            downloadLink.href = href;
+            applyDownloadName();
+        }
+
+        // ---- Classification -----------------------------------------------------
+        const IMAGE_EXT = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif']);
+        const AUDIO_EXT = new Set(['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac', 'weba', 'webm', 'aiff', 'aif']);
+        const extOf = name => (name.toLowerCase().match(/\.([a-z0-9]+)$/) || [, ''])[1];
+        function isImage(file) { return (file.type || '').startsWith('image/') || IMAGE_EXT.has(extOf(file.name)); }
+        function isAudio(file) { return (file.type || '').startsWith('audio/') || AUDIO_EXT.has(extOf(file.name)); }
+        function baseName(name) { const d = name.lastIndexOf('.'); return d > 0 ? name.slice(0, d) : name; }
+
+        // ---- Loading each slot --------------------------------------------------
+        function loadImage(file) {
+            if (!isImage(file)) { showLoadError(`"${file.name}" doesn't look like an image. Use a JPG, PNG, WebP or GIF.`); return; }
+            clearLoadError();
+            imageFile = file;
+            imageThumb.src = trackUrl(URL.createObjectURL(file));
+            imageNameEl.textContent = file.name;
+            imageEmpty.hidden = true;
+            imageFilled.hidden = false;
+            imageSlot.classList.add('filled');
+            afterSlotChange();
+        }
+        function loadAudio(file) {
+            if (!isAudio(file)) { showLoadError(`"${file.name}" doesn't look like audio. Use an MP3, M4A, WAV, AAC, OGG or FLAC.`); return; }
+            clearLoadError();
+            audioFile = file;
+            audioNameEl.textContent = file.name;
+            audioEmpty.hidden = true;
+            audioFilled.hidden = false;
+            audioSlot.classList.add('filled');
+            afterSlotChange();
+        }
+        function afterSlotChange() {
+            optionsSec.hidden = !(imageFile || audioFile);
+            makeBtn.disabled = !(imageFile && audioFile);
+            outputSection.hidden = true;
+            outputVideo.hidden = true;
+        }
+
+        // Wire a slot: click/browse to open the picker, drag-drop, and change.
+        function wireSlot(slot, input, browseId, changeId, load) {
+            const open = e => { if (e) e.stopPropagation(); input.click(); };
+            slot.addEventListener('click', () => input.click());
+            document.getElementById(browseId).addEventListener('click', open);
+            document.getElementById(changeId).addEventListener('click', open);
+            slot.addEventListener('dragover',  e => { e.preventDefault(); slot.classList.add('drag-over'); });
+            slot.addEventListener('dragleave', () => slot.classList.remove('drag-over'));
+            slot.addEventListener('drop', e => {
+                e.preventDefault();
+                slot.classList.remove('drag-over');
+                if (e.dataTransfer.files.length) load(e.dataTransfer.files[0]);
+            });
+            input.addEventListener('change', () => {
+                if (input.files.length) load(input.files[0]);
+                input.value = '';
+            });
+        }
+        wireSlot(imageSlot, imageInput, 'image-browse', 'image-change', loadImage);
+        wireSlot(audioSlot, audioInput, 'audio-browse', 'audio-change', loadAudio);
+
+        document.getElementById('res-selector').addEventListener('click', e => {
+            const btn = e.target.closest('.opt-btn');
+            if (!btn) return;
+            e.currentTarget.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            resHeight = +btn.dataset.h;
+        });
+
+        // ---- FFmpeg -------------------------------------------------------------
+        const FF_UMD   = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd';
+        const CORE_ESM = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+
+        async function ensureFFmpeg() {
+            if (ffmpeg) return ffmpeg;
+            const { FFmpeg } = FFmpegWASM;
+            const { toBlobURL } = FFmpegUtil;
+            if (!coreBlobs) {
+                statusMsg.textContent = 'Loading video engine (~32 MB, first time only)…';
+                coreBlobs = {
+                    classWorkerURL: await toBlobURL(`${FF_UMD}/814.ffmpeg.js`, 'text/javascript'),
+                    coreURL: await toBlobURL(`${CORE_ESM}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${CORE_ESM}/ffmpeg-core.wasm`, 'application/wasm'),
+                };
+            }
+            const ff = new FFmpeg();
+            ff.on('progress', ({ progress }) => {
+                if (progress >= 0 && progress <= 1) statusMsg.textContent = `Encoding… ${Math.round(progress * 100)}%`;
+            });
+            await ff.load(coreBlobs);
+            ffmpeg = ff;
+            return ffmpeg;
+        }
+        function resetFFmpeg() { try { ffmpeg && ffmpeg.terminate(); } catch {} ffmpeg = null; }
+
+        // Loop the still image over the audio and stop at the (shorter) audio's
+        // end. yuv420p + even dimensions keep the MP4 broadly playable.
+        function buildArgs(imgName, audName, outName) {
+            const scale = resHeight ? `scale=-2:${resHeight}` : 'scale=trunc(iw/2)*2:trunc(ih/2)*2';
+            return [
+                '-loop', '1', '-i', imgName,
+                '-i', audName,
+                '-c:v', 'libx264', '-tune', 'stillimage', '-preset', 'veryfast',
+                '-crf', '23', '-pix_fmt', 'yuv420p', '-r', '15',
+                '-vf', scale,
+                '-c:a', 'aac', '-b:a', '192k',
+                '-shortest', '-movflags', '+faststart',
+                outName,
+            ];
+        }
+
+        // ---- Make video ---------------------------------------------------------
+        makeBtn.addEventListener('click', async () => {
+            if (!imageFile || !audioFile) return;
+            const { fetchFile } = FFmpegUtil;
+
+            makeBtn.disabled = true;
+            statusMsg.hidden = false;
+            outputSection.hidden = true;
+            outputVideo.hidden = true;
+
+            const imgName = 'image.' + (extOf(imageFile.name) || 'png');
+            const audName = 'audio.' + (extOf(audioFile.name) || 'dat');
+            const outName = 'video.mp4';
+            try {
+                const ff = await ensureFFmpeg();
+
+                statusMsg.textContent = 'Reading files…';
+                await ff.writeFile(imgName, await fetchFile(imageFile));
+                await ff.writeFile(audName, await fetchFile(audioFile));
+
+                statusMsg.textContent = 'Encoding…';
+                await ff.exec(buildArgs(imgName, audName, outName));
+
+                const data = await ff.readFile(outName);
+                const blob = new Blob([data.buffer], { type: 'video/mp4' });
+                const url = trackUrl(URL.createObjectURL(blob));
+
+                setDownload(baseName(audioFile.name), 'mp4', url);
+                outputSizeEl.textContent = `${(blob.size / 1048576).toFixed(2)} MB`;
+                outputVideo.src = url;
+                outputVideo.hidden = false;
+
+                try { await ff.deleteFile(imgName); await ff.deleteFile(audName); await ff.deleteFile(outName); } catch {}
+
+                outputSection.hidden = false;
+                statusMsg.hidden = true;
+            } catch (err) {
+                const msg = err && err.message ? err.message : String(err);
+                console.error(LOG, 'encode failed', msg);
+                statusMsg.textContent = /memory access|out of bounds|abort/i.test(msg)
+                    ? 'Ran out of memory encoding this video. Try a smaller size, or a shorter audio track, then run again.'
+                    : `Error: ${msg}`;
+                resetFFmpeg();
+            } finally {
+                makeBtn.disabled = !(imageFile && audioFile);
+            }
+        });
+    </script>
+</body>
+</html>
