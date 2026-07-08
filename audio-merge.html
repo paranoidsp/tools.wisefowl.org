@@ -128,6 +128,7 @@
             </span>
             <a id="download-link" class="download-btn" href="#" download>Download</a>
             <span id="output-size"></span>
+            <span id="open-in" class="open-in" hidden></span>
         </div>
         <audio id="output-audio" controls playsinline hidden></audio>
     </section>
@@ -139,6 +140,7 @@
 
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
     <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+    <script src="handoff.js"></script>
     <script>
         // ---- Format registry ----------------------------------------------------
         // Output audio formats, shared in spirit with the Media Clipper. Each entry
@@ -183,6 +185,7 @@
         const filenameExt   = document.getElementById('filename-ext');
         const outputSizeEl  = document.getElementById('output-size');
         const outputAudio   = document.getElementById('output-audio');
+        const openInEl      = document.getElementById('open-in');
         const loadError     = document.getElementById('load-error');
 
         const LOG = '[audio-merge]';
@@ -418,6 +421,7 @@
                 outputSizeEl.textContent = fmtSize(blob.size);
                 outputAudio.src = url;
                 outputAudio.hidden = false;
+                WFHandoff.showOpenIn(openInEl, { blob, name: downloadLink.download, kind: 'audio' });
 
                 try {
                     for (const n of inNames) await ff.deleteFile(n);
@@ -437,6 +441,9 @@
                 mergeBtn.disabled = false;
             }
         });
+
+        // Accept a file handed off from another tool as a queue entry.
+        WFHandoff.receive({ audio: file => addFiles([file]) });
     </script>
 </body>
 </html>

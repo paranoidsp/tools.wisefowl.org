@@ -80,6 +80,14 @@ Reusable patterns. Copy the ones you need; keep the class names.
 - **Output row** — the download link + a `#16a34a` before→after summary
   ("4.2 MB → 1.1 MB (74% smaller)").
 - **Status line** — muted `0.9rem` text for progress ("Processing… (2/5)").
+- **Handoff ("Send to")** — chain tools without a download/re-upload round trip.
+  Include `handoff.js` and add a `<span class="open-in" hidden>` to the output
+  row. After producing output, call
+  `WFHandoff.showOpenIn(el, { blob, name, kind })` — it renders a button per
+  compatible target (from the `TOOLS` registry in `handoff.js`) and hides itself
+  when there are none. On load, call `WFHandoff.receive({ audio: fn, image: fn })`
+  mapping each file `kind` to the tool's normal loader. The blob is passed via a
+  same-origin IndexedDB record; register a new tool by adding it to `TOOLS`.
 - **Notices** — non-blocking. Limitation notice: muted grey. Memory/size
   warning: the amber palette (`#92400e` / `#fef3c7` / `#fde68a`).
 

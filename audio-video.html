@@ -123,6 +123,7 @@
             </span>
             <a id="download-link" class="download-btn" href="#" download>Download</a>
             <span id="output-size"></span>
+            <span id="open-in" class="open-in" hidden></span>
         </div>
         <video id="output-video" controls playsinline hidden></video>
     </section>
@@ -134,6 +135,7 @@
 
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
     <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+    <script src="handoff.js"></script>
     <script>
         // ---- State --------------------------------------------------------------
         let imageFile = null;
@@ -167,6 +169,7 @@
         const filenameExt   = document.getElementById('filename-ext');
         const outputSizeEl  = document.getElementById('output-size');
         const outputVideo   = document.getElementById('output-video');
+        const openInEl      = document.getElementById('open-in');
         const loadError     = document.getElementById('load-error');
 
         const LOG = '[audio-video]';
@@ -328,6 +331,7 @@
                 outputSizeEl.textContent = `${(blob.size / 1048576).toFixed(2)} MB`;
                 outputVideo.src = url;
                 outputVideo.hidden = false;
+                WFHandoff.showOpenIn(openInEl, { blob, name: downloadLink.download, kind: 'video' });
 
                 try { await ff.deleteFile(imgName); await ff.deleteFile(audName); await ff.deleteFile(outName); } catch {}
 
@@ -344,6 +348,9 @@
                 makeBtn.disabled = !(imageFile && audioFile);
             }
         });
+
+        // Accept a file handed off from another tool into the matching slot.
+        WFHandoff.receive({ image: loadImage, audio: loadAudio });
     </script>
 </body>
 </html>

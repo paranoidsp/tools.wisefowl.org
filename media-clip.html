@@ -225,6 +225,7 @@
             </span>
             <a id="download-link" class="download-btn" href="#" download>Download</a>
             <span id="output-size"></span>
+            <span id="open-in" class="open-in" hidden></span>
         </div>
         <video id="output-preview" controls playsinline style="width:100%;max-height:45vh;background:#1a1a1a;border-radius:6px;margin-top:0.5rem;" hidden></video>
         <img id="output-gif" alt="clip preview" style="max-width:100%;border-radius:6px;margin-top:0.5rem;" hidden>
@@ -237,6 +238,7 @@
 
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
     <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+    <script src="handoff.js"></script>
     <script>
         // ---- Format registry ----------------------------------------------------
         // Single source of truth for every output format. To add one, add an entry
@@ -342,6 +344,7 @@
         }
         const outputPreview = document.getElementById('output-preview');
         const outputGif     = document.getElementById('output-gif');
+        const openInEl      = document.getElementById('open-in');
         const loadError     = document.getElementById('load-error');
 
         const LOG = '[media-clip]';
@@ -806,6 +809,7 @@
 
                 setDownload(`${baseName(mediaFile.name)}-clip`, f.ext, url);
                 outputSizeEl.textContent = `${(blob.size / 1048576).toFixed(2)} MB · ${(selEnd - selStart).toFixed(1)}s`;
+                WFHandoff.showOpenIn(openInEl, { blob, name: downloadLink.download, kind: f.kind === 'gif' ? 'image' : f.kind });
 
                 if (f.kind === 'gif') {
                     outputGif.src = url;
@@ -830,6 +834,9 @@
                 clipBtn.disabled = false;
             }
         });
+
+        // Accept a media file handed off from another tool.
+        WFHandoff.receive({ audio: loadFile, video: loadFile });
     </script>
 </body>
 </html>
