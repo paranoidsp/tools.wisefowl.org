@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Audio Grabber — Wisefowl Tools</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦆</text></svg>">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* URL input row */
+        .url-row { display: flex; gap: 0.5rem; margin: 1.5rem 0 0.5rem; flex-wrap: wrap; }
+        #url-input {
+            flex: 1; min-width: 12rem; padding: 0.5rem 0.7rem;
+            border: 1px solid #e5e7eb; border-radius: 5px; font: inherit; font-size: 0.95rem;
+            color: #1a1a1a; background: white;
+        }
+        #url-input:focus { outline: none; border-color: #2563eb; }
+        #load-btn {
+            padding: 0.5rem 1.2rem; background: #2563eb; color: white; border: none;
+            border-radius: 5px; font-size: 0.95rem; cursor: pointer;
+        }
+        #load-btn:hover { background: #1d4ed8; }
+
+        /* Embedded player */
+        .player-wrap {
+            position: relative; width: 100%; aspect-ratio: 16 / 9;
+            background: #1a1a1a; border-radius: 6px; overflow: hidden; margin: 1rem 0 0.5rem;
+        }
+        .player-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+        #manual-block {
+            background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px;
+            padding: 1rem; margin: 1rem 0 0.5rem;
+        }
+        #manual-block p { margin: 0 0 0.6rem; font-size: 0.9rem; }
+        .link-btn {
+            background: none; border: none; color: #2563eb; cursor: pointer;
+            font: inherit; font-size: 0.85rem; padding: 0; text-decoration: underline;
+        }
+
+        /* Segmented selectors (shared visual language with the other tools) */
+        .field-label { font-size: 0.85rem; color: #6b7280; margin: 1rem 0 0.4rem; }
+        .selector { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .opt-btn {
+            flex: 1; min-width: 4rem; padding: 0.4rem;
+            border: 1px solid #e5e7eb; border-radius: 4px; background: white;
+            cursor: pointer; font-size: 0.9rem; color: #6b7280; white-space: nowrap;
+        }
+        .opt-btn.active { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+
+        /* Primary action + Stop */
+        .action-row { display: flex; gap: 0.5rem; align-items: center; margin-top: 1.25rem; flex-wrap: wrap; }
+        #capture-btn {
+            padding: 0.6rem 1.5rem; background: #2563eb; color: white; border: none;
+            border-radius: 5px; font-size: 1rem; cursor: pointer;
+        }
+        #capture-btn:hover { background: #1d4ed8; }
+        #capture-btn:disabled { background: #93c5fd; cursor: not-allowed; }
+        #stop-btn {
+            padding: 0.6rem 1.25rem; background: white; color: #dc2626;
+            border: 1px solid #fca5a5; border-radius: 5px; font-size: 1rem; cursor: pointer;
+        }
+        #stop-btn:hover { border-color: #dc2626; }
+
+        #status-msg { color: #6b7280; font-size: 0.9rem; margin-top: 0.75rem; font-variant-numeric: tabular-nums; }
+        #load-error {
+            color: #dc2626; font-size: 0.9rem;
+            background: #fef2f2; border: 1px solid #fecaca;
+            border-radius: 4px; padding: 0.6rem 0.75rem; margin: 1rem 0;
+        }
+        .note { font-size: 0.82rem; color: #9ca3af; margin: 0.5rem 0 0; }
+        .notice-amber {
+            font-size: 0.82rem; color: #92400e; background: #fef3c7;
+            border: 1px solid #fde68a; border-radius: 4px;
+            padding: 0.5rem 0.75rem; margin: 1rem 0 0;
+        }
+
+        #output-row { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0; flex-wrap: wrap; }
+        #output-size { color: #16a34a; font-size: 0.9rem; }
+        #output-audio { width: 100%; margin-top: 0.5rem; }
+
+        /* Unsupported-browser takeover */
+        #unsupported {
+            background: #fef3c7; border: 1px solid #fde68a; border-radius: 6px;
+            padding: 1.25rem 1.5rem; margin: 1.5rem 0; color: #92400e;
+        }
+        #unsupported h2 { border: none; margin: 0 0 0.5rem; color: #92400e; }
+        #unsupported p { margin: 0.4rem 0 0; font-size: 0.95rem; }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>YouTube Audio Grabber</h1>
+            <p class="subtitle">Record a YouTube video's audio to a file — captured and converted entirely in your browser, nothing uploaded.</p>
+        </div>
+        <a class="private-link" href="/">← Tools</a>
+    </header>
+
+    <!-- Shown instead of the tool on browsers that can't capture tab audio -->
+    <section id="unsupported" hidden>
+        <h2>Needs desktop Chrome or Edge</h2>
+        <p>This tool records a browser tab's audio, which only works in desktop
+        Chromium browsers (Chrome, Edge, Brave, Opera). Firefox can't share tab
+        audio, and mobile browsers have no tab-capture API at all.</p>
+        <p>Open this page in Chrome or Edge on a computer to use it.</p>
+    </section>
+
+    <main id="tool" hidden>
+        <div class="url-row">
+            <input id="url-input" type="url" inputmode="url" spellcheck="false"
+                   autocomplete="off" placeholder="Paste a YouTube link…"
+                   aria-label="YouTube URL">
+            <button id="load-btn" type="button">Load</button>
+        </div>
+        <p id="load-error" hidden></p>
+
+        <section id="stage" hidden>
+            <!-- Embedded player (default). YT.Player replaces this div with an iframe. -->
+            <div class="player-wrap" id="player-wrap"><div id="yt-player"></div></div>
+            <p class="note" id="embed-note">
+                Video won't play here?
+                <button class="link-btn" id="switch-manual" type="button">Capture from a new tab instead</button>.
+            </p>
+
+            <!-- Manual fallback (embed-disabled videos) -->
+            <div id="manual-block" hidden>
+                <p>Open the video in a new tab, press <strong>Capture audio</strong>
+                below, pick that YouTube tab with <strong>“Share tab audio”</strong>
+                ticked, then play the video. Press <strong>Stop</strong> when it ends.</p>
+                <a id="open-tab" class="download-btn" href="#" target="_blank" rel="noopener">Open video in a new tab ↗</a>
+            </div>
+
+            <p class="field-label">Format</p>
+            <div class="selector" id="format-selector"></div>
+
+            <div id="bitrate-field">
+                <p class="field-label">Quality</p>
+                <div class="selector" id="bitrate-selector">
+                    <button class="opt-btn" data-br="96k" type="button">Low</button>
+                    <button class="opt-btn active" data-br="160k" type="button">Medium</button>
+                    <button class="opt-btn" data-br="256k" type="button">High</button>
+                </div>
+            </div>
+
+            <div class="action-row">
+                <button id="capture-btn" type="button">Capture audio</button>
+                <button id="stop-btn" type="button" hidden>■ Stop</button>
+            </div>
+            <div id="status-msg" hidden></div>
+
+            <div class="notice-amber">
+                <strong>Real-time capture.</strong> Recording plays the video through
+                in real time (a 4-min song takes ~4 min) and re-encodes the audio from
+                playback, so quality is capped by what YouTube streams — not the
+                original master. For personal use; downloading is against YouTube's
+                Terms of Service.
+            </div>
+        </section>
+
+        <section id="output-section" hidden>
+            <h2>Output</h2>
+            <div id="output-row">
+                <span class="filename-field">
+                    <input id="filename-input" class="filename-input" type="text" spellcheck="false" autocomplete="off" aria-label="Output file name">
+                    <span id="filename-ext" class="filename-ext"></span>
+                </span>
+                <a id="download-link" class="download-btn" href="#" download>Download</a>
+                <span id="output-size"></span>
+            </div>
+            <audio id="output-audio" controls hidden></audio>
+        </section>
+    </main>
+
+    <footer>
+        <a href="/changelog.html">changelog</a> &middot;
+        <a href="https://en.wikipedia.org/wiki/Existentialism">wisefowl.org</a>
+    </footer>
+
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+    <script>
+        const LOG = '[yt-audio]';
+
+        // ---- Format registry ----------------------------------------------------
+        // Audio-only subset of the media-clipper's registry — the same encoders,
+        // same behaviour, so the whole tool collection converts audio identically.
+        //   ext/mime : output filename extension + blob type
+        //   codec    : ffmpeg encoder args (applied after -vn)
+        //   bitrate  : true for lossy formats (shows the Quality selector)
+        const FORMATS = {
+            mp3:  { label: 'MP3',  ext: 'mp3',  mime: 'audio/mpeg', bitrate: true,  codec: ['-c:a', 'libmp3lame'] },
+            m4a:  { label: 'M4A',  ext: 'm4a',  mime: 'audio/mp4',  bitrate: true,  codec: ['-c:a', 'aac'] },
+            aac:  { label: 'AAC',  ext: 'aac',  mime: 'audio/aac',  bitrate: true,  codec: ['-c:a', 'aac'] },
+            ogg:  { label: 'OGG',  ext: 'ogg',  mime: 'audio/ogg',  bitrate: true,  codec: ['-c:a', 'libvorbis'] },
+            flac: { label: 'FLAC', ext: 'flac', mime: 'audio/flac', bitrate: false, codec: ['-c:a', 'flac'] },
+            wav:  { label: 'WAV',  ext: 'wav',  mime: 'audio/wav',  bitrate: false, codec: ['-c:a', 'pcm_s16le'] },
+        };
+        const AUDIO_FORMATS = ['mp3', 'm4a', 'aac', 'ogg', 'flac', 'wav'];
+
+        // ---- State --------------------------------------------------------------
+        let format = 'mp3';
+        let bitrate = '160k';
+        let mode = 'embedded';            // 'embedded' | 'manual'
+        let videoId = null;
+        let defaultTitle = 'audio';       // filled from the video title when known
+        let player = null;
+        let ytApiPromise = null;
+        let recorder = null;
+        let recordedChunks = [];
+        let captureStream = null;
+        let recording = false;
+        let pollTimer = 0, recStart = 0;
+        let ffmpeg = null, coreBlobs = null;
+        let outputUrls = [];
+
+        const trackUrl = u => { outputUrls.push(u); return u; };
+        const revokeOutputs = () => { outputUrls.forEach(u => URL.revokeObjectURL(u)); outputUrls = []; };
+
+        // ---- Elements -----------------------------------------------------------
+        const toolEl     = document.getElementById('tool');
+        const unsupported = document.getElementById('unsupported');
+        const urlInput   = document.getElementById('url-input');
+        const loadBtn    = document.getElementById('load-btn');
+        const loadError  = document.getElementById('load-error');
+        const stage      = document.getElementById('stage');
+        const playerWrap = document.getElementById('player-wrap');
+        const embedNote  = document.getElementById('embed-note');
+        const switchManualBtn = document.getElementById('switch-manual');
+        const manualBlock = document.getElementById('manual-block');
+        const openTab    = document.getElementById('open-tab');
+        const formatSel  = document.getElementById('format-selector');
+        const bitrateField = document.getElementById('bitrate-field');
+        const captureBtn = document.getElementById('capture-btn');
+        const stopBtn    = document.getElementById('stop-btn');
+        const statusMsg  = document.getElementById('status-msg');
+        const outputSection = document.getElementById('output-section');
+        const downloadLink  = document.getElementById('download-link');
+        const filenameInput = document.getElementById('filename-input');
+        const filenameExt   = document.getElementById('filename-ext');
+        const outputSizeEl  = document.getElementById('output-size');
+        const outputAudio   = document.getElementById('output-audio');
+
+        // ---- Helpers ------------------------------------------------------------
+        function fmtTime(t) {
+            if (!isFinite(t) || t < 0) t = 0;
+            const m = Math.floor(t / 60);
+            const s = Math.floor(t % 60);
+            return `${m}:${String(s).padStart(2, '0')}`;
+        }
+        function showError(msg) { loadError.textContent = msg; loadError.hidden = false; console.warn(LOG, msg); }
+        function clearError() { loadError.hidden = true; loadError.textContent = ''; }
+
+        // Editable output filename: base is user-editable, extension is locked.
+        function sanitizeBase(s) {
+            return s.replace(/[\/\\:*?"<>|\x00-\x1f]/g, '').replace(/\.+$/, '').trim();
+        }
+        function applyDownloadName() {
+            const base = sanitizeBase(filenameInput.value) || 'audio';
+            downloadLink.download = base + filenameExt.textContent;
+        }
+        filenameInput.addEventListener('input', applyDownloadName);
+        function setDownload(base, ext, href) {
+            filenameInput.value = base;
+            filenameExt.textContent = '.' + ext;
+            downloadLink.href = href;
+            applyDownloadName();
+        }
+
+        // ---- Browser support ----------------------------------------------------
+        // Tab-audio capture is desktop-Chromium-only. Firefox's getDisplayMedia
+        // returns no audio track; mobile browsers have no getDisplayMedia at all.
+        function browserSupport() {
+            const md = navigator.mediaDevices;
+            const hasGDM = !!(md && md.getDisplayMedia);
+            const hasRec = typeof MediaRecorder !== 'undefined' && !!MediaRecorder.isTypeSupported;
+            const ua = navigator.userAgent || '';
+            const isFirefox = /firefox/i.test(ua);
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(ua)
+                || (navigator.maxTouchPoints > 1 && /Macintosh/i.test(ua) && !hasGDM);
+            return hasGDM && hasRec && !isFirefox && !isMobile;
+        }
+
+        // ---- URL parsing --------------------------------------------------------
+        // Accept watch, youtu.be, shorts and embed links; pull the 11-char id.
+        function parseVideoId(raw) {
+            const s = (raw || '').trim();
+            if (!s) return null;
+            let u;
+            try { u = new URL(s); } catch { return /^[a-zA-Z0-9_-]{11}$/.test(s) ? s : null; }
+            const host = u.hostname.replace(/^www\./, '');
+            const ok = id => (/^[a-zA-Z0-9_-]{11}$/.test(id) ? id : null);
+            if (host === 'youtu.be') return ok(u.pathname.slice(1));
+            if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
+                if (u.searchParams.get('v')) return ok(u.searchParams.get('v'));
+                const m = u.pathname.match(/^\/(?:shorts|embed|v)\/([^/?#]+)/);
+                if (m) return ok(m[1]);
+            }
+            return null;
+        }
+
+        // ---- YouTube IFrame API (lazy) ------------------------------------------
+        function loadYouTubeAPI() {
+            if (ytApiPromise) return ytApiPromise;
+            ytApiPromise = new Promise((resolve, reject) => {
+                if (window.YT && window.YT.Player) return resolve(window.YT);
+                window.onYouTubeIframeAPIReady = () => resolve(window.YT);
+                const s = document.createElement('script');
+                s.src = 'https://www.youtube.com/iframe_api';
+                s.onerror = () => reject(new Error('Could not load the YouTube player.'));
+                document.head.appendChild(s);
+            });
+            return ytApiPromise;
+        }
+
+        function createPlayer(id) {
+            // Rebuild the target node each load (YT.Player consumes it).
+            playerWrap.innerHTML = '<div id="yt-player"></div>';
+            loadYouTubeAPI().then(YT => {
+                player = new YT.Player('yt-player', {
+                    videoId: id,
+                    playerVars: { autoplay: 0, controls: 1, rel: 0, modestbranding: 1, playsinline: 1 },
+                    events: {
+                        onReady: () => {
+                            try {
+                                const d = player.getVideoData && player.getVideoData();
+                                if (d && d.title) defaultTitle = sanitizeBase(d.title) || 'audio';
+                            } catch {}
+                        },
+                        onStateChange: e => { if (e.data === 0 && recording) stopCapture(); }, // 0 = ENDED
+                        onError: e => {
+                            // 101/150: the owner disabled embedding → manual fallback.
+                            if (e.data === 101 || e.data === 150) switchToManual(true);
+                            else console.warn(LOG, 'player error', e.data);
+                        },
+                    },
+                });
+            }).catch(err => {
+                console.warn(LOG, err.message);
+                switchToManual(true);
+            });
+        }
+
+        // ---- Load a URL ---------------------------------------------------------
+        function loadUrl() {
+            clearError();
+            const id = parseVideoId(urlInput.value);
+            if (!id) {
+                showError('That doesn’t look like a YouTube link. Paste a URL like https://www.youtube.com/watch?v=… or https://youtu.be/….');
+                return;
+            }
+            resetOutput();
+            videoId = id;
+            defaultTitle = 'audio';
+            openTab.href = 'https://www.youtube.com/watch?v=' + id;
+            buildFormatOptions();
+            setMode('embedded');
+            createPlayer(id);
+            stage.hidden = false;
+        }
+        loadBtn.addEventListener('click', loadUrl);
+        urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') loadUrl(); });
+
+        function setMode(m) {
+            mode = m;
+            const manual = m === 'manual';
+            manualBlock.hidden = !manual;
+            playerWrap.hidden = manual;
+            embedNote.hidden = manual;
+            captureBtn.textContent = manual ? 'Start capture' : 'Capture audio';
+        }
+        function switchToManual(auto) {
+            setMode('manual');
+            if (auto) showError('This video can’t be embedded here — use the new-tab capture below instead.');
+        }
+        switchManualBtn.addEventListener('click', () => { clearError(); switchToManual(false); });
+
+        // ---- Format / quality selectors -----------------------------------------
+        function buildFormatOptions() {
+            format = AUDIO_FORMATS[0];
+            formatSel.innerHTML = '';
+            AUDIO_FORMATS.forEach((key, i) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'opt-btn' + (i === 0 ? ' active' : '');
+                btn.dataset.fmt = key;
+                btn.textContent = FORMATS[key].label;
+                formatSel.appendChild(btn);
+            });
+            updateBitrateVisibility();
+        }
+        formatSel.addEventListener('click', e => {
+            const btn = e.target.closest('.opt-btn');
+            if (!btn) return;
+            formatSel.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            format = btn.dataset.fmt;
+            updateBitrateVisibility();
+        });
+        document.getElementById('bitrate-selector').addEventListener('click', e => {
+            const btn = e.target.closest('.opt-btn');
+            if (!btn) return;
+            e.currentTarget.querySelectorAll('.opt-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            bitrate = btn.dataset.br;
+        });
+        function updateBitrateVisibility() { bitrateField.hidden = !FORMATS[format].bitrate; }
+
+        // ---- Capture ------------------------------------------------------------
+        captureBtn.addEventListener('click', startCapture);
+        stopBtn.addEventListener('click', stopCapture);
+
+        async function startCapture() {
+            clearError();
+            captureBtn.disabled = true;
+            let stream;
+            try {
+                // preferCurrentTab pre-selects our own tab (the embedded player);
+                // in manual mode we let the user pick the separate YouTube tab.
+                const opts = { video: true, audio: true };
+                if (mode === 'embedded') opts.preferCurrentTab = true;
+                stream = await navigator.mediaDevices.getDisplayMedia(opts);
+            } catch (e) {
+                showError('Tab share was cancelled. Click the button again and choose the tab with the video, ticking “Share tab audio”.');
+                captureBtn.disabled = false;
+                return;
+            }
+
+            const audioTracks = stream.getAudioTracks();
+            if (!audioTracks.length) {
+                stream.getTracks().forEach(t => t.stop());
+                showError('No audio was shared. Re-run and tick “Share tab audio” in the picker. (Firefox can’t share tab audio — use Chrome or Edge.)');
+                captureBtn.disabled = false;
+                return;
+            }
+
+            stream.getVideoTracks().forEach(t => t.stop());   // audio only
+            captureStream = stream;
+
+            recordedChunks = [];
+            const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+                ? 'audio/webm;codecs=opus' : 'audio/webm';
+            recorder = new MediaRecorder(new MediaStream(audioTracks), { mimeType: mime, audioBitsPerSecond: 192000 });
+            recorder.ondataavailable = e => { if (e.data && e.data.size) recordedChunks.push(e.data); };
+            recorder.onstop = finalizeRecording;
+            // If the user ends sharing from the browser's own UI, stop cleanly.
+            audioTracks[0].addEventListener('ended', stopCapture);
+
+            recorder.start();
+            recording = true;
+            stopBtn.hidden = false;
+            statusMsg.hidden = false;
+
+            if (mode === 'embedded' && player) {
+                try { player.seekTo(0); player.unMute(); player.setVolume(100); player.playVideo(); } catch {}
+                startProgressPolling();
+            } else {
+                recStart = Date.now();
+                startElapsedPolling();
+            }
+        }
+
+        function stopCapture() {
+            if (!recording) return;
+            recording = false;
+            stopPolling();
+            stopBtn.hidden = true;
+            if (mode === 'embedded' && player) { try { player.pauseVideo(); } catch {} }
+            try { if (recorder && recorder.state !== 'inactive') recorder.stop(); } catch {}
+            if (captureStream) { captureStream.getTracks().forEach(t => t.stop()); captureStream = null; }
+        }
+
+        function startProgressPolling() {
+            stopPolling();
+            pollTimer = setInterval(() => {
+                if (!player || !player.getDuration) return;
+                const cur = player.getCurrentTime() || 0;
+                const dur = player.getDuration() || 0;
+                statusMsg.textContent = `Recording… ${fmtTime(cur)} / ${fmtTime(dur)}  (auto-stops at the end, or press Stop)`;
+            }, 250);
+        }
+        function startElapsedPolling() {
+            stopPolling();
+            pollTimer = setInterval(() => {
+                statusMsg.textContent = `Recording… ${fmtTime((Date.now() - recStart) / 1000)}  (press Stop when the video ends)`;
+            }, 250);
+        }
+        function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = 0; } }
+
+        async function finalizeRecording() {
+            const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+            recordedChunks = [];
+            if (!blob.size) {
+                showError('Nothing was recorded. Make sure the video actually played with tab audio shared.');
+                resetToReady();
+                return;
+            }
+            await transcode(blob);
+        }
+
+        // ---- FFmpeg transcode (copied from the media-clipper) --------------------
+        // The worker chunk is the UMD build; the core is the ESM build so the module
+        // worker can import() it. Blob URLs are cached so recovering from a wasm
+        // crash re-instantiates without re-downloading.
+        const FF_UMD   = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd';
+        const CORE_ESM = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+
+        async function ensureFFmpeg() {
+            if (ffmpeg) return ffmpeg;
+            const { FFmpeg } = FFmpegWASM;
+            const { toBlobURL } = FFmpegUtil;
+            if (!coreBlobs) {
+                statusMsg.textContent = 'Loading the audio engine (~32 MB, first time only)…';
+                coreBlobs = {
+                    classWorkerURL: await toBlobURL(`${FF_UMD}/814.ffmpeg.js`, 'text/javascript'),
+                    coreURL: await toBlobURL(`${CORE_ESM}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${CORE_ESM}/ffmpeg-core.wasm`, 'application/wasm'),
+                };
+            }
+            const ff = new FFmpeg();
+            ff.on('progress', ({ progress }) => {
+                if (progress >= 0 && progress <= 1) statusMsg.textContent = `Converting… ${Math.round(progress * 100)}%`;
+            });
+            await ff.load(coreBlobs);
+            ffmpeg = ff;
+            return ffmpeg;
+        }
+        function resetFFmpeg() { try { ffmpeg && ffmpeg.terminate(); } catch {} ffmpeg = null; }
+
+        async function transcode(webmBlob) {
+            const { fetchFile } = FFmpegUtil;
+            const f = FORMATS[format];
+            statusMsg.hidden = false;
+            captureBtn.disabled = true;
+            try {
+                const ff = await ensureFFmpeg();
+                const inName = 'input.webm';
+                const outName = 'audio.' + f.ext;
+
+                statusMsg.textContent = 'Reading recording…';
+                await ff.writeFile(inName, await fetchFile(webmBlob));
+
+                statusMsg.textContent = 'Converting…';
+                const args = ['-i', inName, '-vn', ...f.codec];
+                if (f.bitrate) args.push('-b:a', bitrate);
+                args.push(outName);
+                await ff.exec(args);
+
+                const data = await ff.readFile(outName);
+                const blob = new Blob([data.buffer], { type: f.mime });
+                const url = trackUrl(URL.createObjectURL(blob));
+
+                setDownload(defaultTitle || 'audio', f.ext, url);
+                outputSizeEl.textContent = `${(blob.size / 1048576).toFixed(2)} MB`;
+                outputAudio.src = url;
+                outputAudio.hidden = false;
+
+                try { await ff.deleteFile(inName); await ff.deleteFile(outName); } catch {}
+
+                outputSection.hidden = false;
+                statusMsg.hidden = true;
+            } catch (err) {
+                const msg = err && err.message ? err.message : String(err);
+                statusMsg.textContent = /memory access|out of bounds|abort/i.test(msg)
+                    ? 'Ran out of memory converting this recording. Try a shorter video or lower quality.'
+                    : `Error: ${msg}`;
+                resetFFmpeg();
+            } finally {
+                resetToReady();
+            }
+        }
+
+        // ---- Reset --------------------------------------------------------------
+        function resetToReady() {
+            recording = false;
+            stopPolling();
+            stopBtn.hidden = true;
+            captureBtn.disabled = false;
+        }
+        function resetOutput() {
+            revokeOutputs();
+            outputSection.hidden = true;
+            outputAudio.hidden = true;
+            outputAudio.removeAttribute('src');
+            statusMsg.hidden = true;
+        }
+
+        // ---- Boot ---------------------------------------------------------------
+        if (browserSupport()) {
+            toolEl.hidden = false;
+        } else {
+            unsupported.hidden = false;
+        }
+    </script>
+</body>
+</html>
