@@ -44,6 +44,7 @@
         #queue-list li .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         #queue-list li .meta { color: #9ca3af; font-size: 0.8rem; white-space: nowrap; }
         #queue-list li .err { color: #dc2626; font-size: 0.8rem; }
+        #queue-list li .incompatible { color: #9ca3af; font-size: 0.8rem; font-style: italic; }
         .queue-btn {
             background: none;
             border: 1px solid #e5e7eb;
@@ -77,7 +78,7 @@
             color: #9ca3af;
             margin: 0.5rem 0 1.5rem;
         }
-        #memory-warning {
+        #memory-warning, #video-warning {
             font-size: 0.82rem;
             color: #92400e;
             background: #fef3c7;
@@ -163,9 +164,9 @@
     </header>
 
     <div id="drop-zone">
-        <p>Drop images or PDFs here</p>
+        <p>Drop images, PDFs, or video here</p>
         <p class="hint">or <button id="browse-btn" type="button">browse files</button></p>
-        <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.webp,.pdf" multiple hidden>
+        <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.webp,.pdf,.mp4,.mov,.webm,.mkv,.avi" multiple hidden>
     </div>
 
     <section id="queue-section" hidden>
@@ -191,8 +192,10 @@
             <button class="format-btn" data-format="pdf" type="button">PDF</button>
         </div>
 
+        <p id="combine-hint" class="limitation-notice" hidden>All queued files are video — switch to "Compress separately" to process them.</p>
         <button id="create-btn" type="button">Create PDF</button>
         <div id="memory-warning" hidden>Large document (&gt;40 pages) — may be slow on mobile.</div>
+        <div id="video-warning" hidden>Large video (&gt;200 MB) — encoding in the browser may be slow and memory-heavy.</div>
         <div id="status-msg" hidden></div>
     </section>
 
@@ -217,6 +220,8 @@
 
     <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+    <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
     <script src="handoff.js"></script>
     <script type="module">
         import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.min.mjs';
@@ -229,7 +234,10 @@
             high:   { jpeg: 0.90, imgMaxDim: 2400, pdfScale: 3.0 },
         };
 
-        const ACCEPTED = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
+        const ACCEPTED = new Set([
+            'image/jpeg', 'image/png', 'image/webp', 'application/pdf',
+            'video/mp4', 'video/quicktime', 'video/webm', 'video/x-matroska', 'video/x-msvideo',
+        ]);
 
         let queue = [];
         let nextId = 0;
@@ -251,6 +259,8 @@
         const queueList     = document.getElementById('queue-list');
         const pageCountSum  = document.getElementById('page-count-summary');
         const memWarn       = document.getElementById('memory-warning');
+        const videoWarn     = document.getElementById('video-warning');
+        const combineHint   = document.getElementById('combine-hint');
         const createBtn     = document.getElementById('create-btn');
         const statusMsg     = document.getElementById('status-msg');
         const outputSection = document.getElementById('output-section');
@@ -295,15 +305,30 @@
             fileInput.value = '';
         });
 
+        function readVideoDuration(file) {
+            return new Promise((res, rej) => {
+                const url = URL.createObjectURL(file);
+                const v = document.createElement('video');
+                v.preload = 'metadata';
+                v.onloadedmetadata = () => { URL.revokeObjectURL(url); res(v.duration); };
+                v.onerror = () => { URL.revokeObjectURL(url); rej(new Error('metadata read failed')); };
+                v.src = url;
+            });
+        }
+
         async function addFiles(files) {
             for (const file of files) {
                 if (!ACCEPTED.has(file.type)) continue;
+                const type = file.type === 'application/pdf' ? 'pdf'
+                           : file.type.startsWith('video/') ? 'video'
+                           : 'image';
                 const item = {
                     id: nextId++,
                     file,
-                    type: file.type === 'application/pdf' ? 'pdf' : 'image',
+                    type,
                     name: file.name,
                     pageCount: null,
+                    duration: null,
                     error: null,
                 };
                 queue.push(item);
@@ -316,6 +341,13 @@
                         doc.destroy();
                     } catch {
                         item.error = 'Failed to read PDF';
+                    }
+                    renderQueue();
+                } else if (item.type === 'video') {
+                    try {
+                        item.duration = await readVideoDuration(file);
+                    } catch {
+                        item.error = 'Failed to read video';
                     }
                     renderQueue();
                 }
@@ -349,18 +381,27 @@
             const pages = totalPages();
             pageCountSum.textContent = `(${queue.length} file${queue.length !== 1 ? 's' : ''}, ~${pages} page${pages !== 1 ? 's' : ''})`;
             memWarn.hidden = pages <= 40;
+            videoWarn.hidden = totalVideoBytes() <= 200 * 1024 * 1024;
 
             imageFormatSelector.hidden = !(activeMode === 'separate' && queue.some(x => x.type === 'image'));
 
             queueList.innerHTML = '';
             queue.forEach((item, i) => {
                 const li = document.createElement('li');
-                const icon = item.type === 'pdf' ? '📄' : '🖼';
-                const meta = item.error
-                    ? `<span class="err">${item.error}</span>`
-                    : item.type === 'pdf'
-                        ? `<span class="meta">${item.pageCount != null ? item.pageCount + ' page' + (item.pageCount !== 1 ? 's' : '') : 'loading…'}</span>`
-                        : `<span class="meta">image</span>`;
+                const icon = item.type === 'pdf' ? '📄' : item.type === 'video' ? '🎬' : '🖼';
+                const incompatible = activeMode === 'combined' && item.type === 'video';
+                let meta;
+                if (incompatible) {
+                    meta = `<span class="incompatible">can't combine — switch to Compress separately</span>`;
+                } else if (item.error) {
+                    meta = `<span class="err">${item.error}</span>`;
+                } else if (item.type === 'pdf') {
+                    meta = `<span class="meta">${item.pageCount != null ? item.pageCount + ' page' + (item.pageCount !== 1 ? 's' : '') : 'loading…'}</span>`;
+                } else if (item.type === 'video') {
+                    meta = `<span class="meta">${item.duration != null ? Math.round(item.duration) + 's' : 'loading…'}</span>`;
+                } else {
+                    meta = `<span class="meta">image</span>`;
+                }
                 li.innerHTML = `
                     <span>${icon}</span>
                     <span class="name" title="${item.name}">${item.name}</span>
@@ -371,6 +412,24 @@
                 `;
                 queueList.appendChild(li);
             });
+
+            updateCreateBtnState();
+        }
+
+        function totalVideoBytes() {
+            return queue.filter(x => x.type === 'video').reduce((n, x) => n + x.file.size, 0);
+        }
+
+        function eligibleItems() {
+            return activeMode === 'combined'
+                ? queue.filter(x => !x.error && x.type !== 'video')
+                : queue.filter(x => !x.error);
+        }
+
+        function updateCreateBtnState() {
+            const hasEligible = eligibleItems().length > 0;
+            createBtn.disabled = !hasEligible;
+            combineHint.hidden = !(activeMode === 'combined' && queue.length > 0 && !hasEligible);
         }
 
         queueList.addEventListener('click', e => {
@@ -470,6 +529,66 @@
             return inputType === 'image/webp' ? 'image/webp' : 'image/jpeg';
         }
 
+        // Same loading/crash-recovery pattern as media-clip.html: the worker
+        // chunk is the UMD build, the core must be the ESM build so the module
+        // worker can `import()` it. Blob URLs are cached so recovering from a
+        // crash re-instantiates without re-downloading.
+        const FF_UMD   = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd';
+        const CORE_ESM = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+        let ffmpeg = null;
+        let coreBlobs = null;
+
+        async function ensureFFmpeg() {
+            if (ffmpeg) return ffmpeg;
+            const { FFmpeg } = FFmpegWASM;
+            const { toBlobURL } = FFmpegUtil;
+            if (!coreBlobs) {
+                statusMsg.textContent = 'Loading video engine (~32 MB, first time only)…';
+                coreBlobs = {
+                    classWorkerURL: await toBlobURL(`${FF_UMD}/814.ffmpeg.js`, 'text/javascript'),
+                    coreURL: await toBlobURL(`${CORE_ESM}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${CORE_ESM}/ffmpeg-core.wasm`, 'application/wasm'),
+                };
+            }
+            const ff = new FFmpeg();
+            ff.on('progress', ({ progress }) => {
+                if (progress >= 0 && progress <= 1) {
+                    statusMsg.textContent = `Encoding… ${Math.round(progress * 100)}%`;
+                }
+            });
+            await ff.load(coreBlobs);
+            ffmpeg = ff;
+            return ffmpeg;
+        }
+
+        function resetFFmpeg() {
+            try { ffmpeg && ffmpeg.terminate(); } catch {}
+            ffmpeg = null;
+        }
+
+        const VIDEO_QUALITY = {
+            low:    { crf: 30, scale: '-2:480' },
+            medium: { crf: 26, scale: '-2:720' },
+            high:   { crf: 21, scale: null },
+        };
+
+        async function compressVideo(item, level) {
+            const { fetchFile } = FFmpegUtil;
+            const vq = VIDEO_QUALITY[level];
+            const ff = await ensureFFmpeg();
+            const inName = 'in' + item.id + (item.name.match(/\.[a-z0-9]+$/i)?.[0] || '.bin');
+            const outName = 'out' + item.id + '.mp4';
+            await ff.writeFile(inName, await fetchFile(item.file));
+            const args = ['-i', inName, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', String(vq.crf),
+                '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'aac', '-b:a', '128k'];
+            if (vq.scale) args.push('-vf', `scale=${vq.scale}`);
+            args.push(outName);
+            await ff.exec(args);
+            const data = await ff.readFile(outName);
+            try { await ff.deleteFile(inName); await ff.deleteFile(outName); } catch {}
+            return new Uint8Array(data.buffer);
+        }
+
         function compressedName(originalName, ext = '.pdf') {
             const dot = originalName.lastIndexOf('.');
             const base = dot >= 0 ? originalName.slice(0, dot) : originalName;
@@ -497,6 +616,10 @@
         }
 
         async function processItemSeparate(item, cfg, level, imageFormat) {
+            if (item.type === 'video') {
+                const bytes = await compressVideo(item, level);
+                return { name: compressedName(item.name, '.mp4'), bytes, mime: 'video/mp4', kind: 'video' };
+            }
             const { PDFDocument } = window.PDFLib;
             if (item.type === 'pdf' || (item.type === 'image' && imageFormat === 'pdf')) {
                 const doc = await PDFDocument.create();
@@ -514,7 +637,7 @@
         }
 
         createBtn.addEventListener('click', async () => {
-            const valid = queue.filter(x => !x.error);
+            const valid = eligibleItems();
             if (valid.length === 0) return;
             const cfg = QUALITY[activeLevel];
             const totalInputBytes = valid.reduce((n, x) => n + x.file.size, 0);
@@ -618,14 +741,18 @@
                 statusMsg.hidden = true;
             } catch (err) {
                 statusMsg.textContent = `Error: ${err.message}`;
+                // A wasm trap leaves the ffmpeg instance unusable; drop it so
+                // the next attempt starts from a fresh engine.
+                resetFFmpeg();
             } finally {
-                createBtn.disabled = false;
+                updateCreateBtnState();
             }
         });
 
         WFHandoff.receive({
             image: f => addFiles([f]),
             pdf:   f => addFiles([f]),
+            video: f => addFiles([f]),
         });
     </script>
 </body>

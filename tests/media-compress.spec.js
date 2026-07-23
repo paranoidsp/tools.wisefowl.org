@@ -1,5 +1,5 @@
 const { test, expect } = require('./helpers/fixtures');
-const { attachImages, attachPdf } = require('./helpers/gen');
+const { attachImages, attachPdf, attachMedia } = require('./helpers/gen');
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/media-compress.html');
@@ -99,4 +99,32 @@ test('accepts a PDF input (exercises pdf.js)', async ({ page }) => {
   await page.click('#create-btn');
   await expect(page.locator('#output-section')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('#download-link')).toHaveAttribute('download', /\.pdf$/);
+});
+
+test('video is accepted and shown as incompatible with Combine', async ({ page }) => {
+  await attachImages(page, 1);
+  await attachMedia(page, { video: true, ms: 1000 });
+  await expect(page.locator('#queue-list li')).toHaveCount(2);
+  await expect(page.locator('#queue-list li .incompatible')).toBeVisible();
+  await page.click('#create-btn');
+  await expect(page.locator('#output-section')).toBeVisible({ timeout: 60_000 });
+  // The video was skipped; the PDF still built from the image alone.
+  await expect(page.locator('#download-link')).toHaveAttribute('download', /\.pdf$/);
+});
+
+test('an all-video queue disables Combine and shows a hint', async ({ page }) => {
+  await attachMedia(page, { video: true, ms: 1000 });
+  await expect(page.locator('#create-btn')).toBeDisabled();
+  await expect(page.locator('#combine-hint')).toBeVisible();
+});
+
+test('separate mode compresses video to MP4', async ({ page }) => {
+  test.setTimeout(180_000);
+  await attachMedia(page, { video: true, ms: 1500 });
+  await page.click('.mode-btn[data-mode="separate"]');
+  await expect(page.locator('#create-btn')).toBeEnabled();
+  await page.click('#create-btn');
+  await expect(page.locator('#output-section')).toBeVisible({ timeout: 150_000 });
+  await expect(page.locator('#file-list a')).toHaveCount(1);
+  await expect(page.locator('#file-list a').first()).toHaveAttribute('download', /-compressed\.mp4$/);
 });

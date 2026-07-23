@@ -17,8 +17,8 @@ test('offers compatible targets and excludes the current tool', async ({ page })
   await page.goto('/audio-video.html');
   expect(await targetsFor(page, 'audio', 'audio/mpeg')).toEqual(['Media Clipper', 'Audio Merge']);
 
-  // A video output (e.g. its own MP4) can only be trimmed in the Clipper.
-  expect(await targetsFor(page, 'video', 'video/mp4')).toEqual(['Media Clipper']);
+  // A video output (e.g. its own MP4) can go to the Clipper or Media Compressor.
+  expect(await targetsFor(page, 'video', 'video/mp4')).toEqual(['Media Clipper', 'Media Compressor']);
 });
 
 test('an image output offers Audio to Video and Media Compressor', async ({ page }) => {

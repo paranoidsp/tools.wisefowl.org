@@ -15,7 +15,7 @@
     { file: 'media-clip.html',    name: 'Media Clipper',    accepts: ['audio', 'video'] },
     { file: 'audio-merge.html',   name: 'Audio Merge',      accepts: ['audio'] },
     { file: 'audio-video.html',   name: 'Audio to Video',   accepts: ['image', 'audio'] },
-    { file: 'media-compress.html', name: 'Media Compressor', accepts: ['image', 'pdf'] },
+    { file: 'media-compress.html', name: 'Media Compressor', accepts: ['image', 'pdf', 'video'] },
   ];
 
   const IMAGE_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif'];
