@@ -34,8 +34,8 @@ Inspired by [Simon Willison's tools](https://tools.simonwillison.net) — a wond
 One tool per commit. Use conventional commits with the tool name as scope:
 
 ```
-feat(pdf-compressor): add separate PDFs mode
-fix(pdf-compressor): correct filename encoding for unicode
+feat(media-compressor): add separate PDFs mode
+fix(media-compressor): correct filename encoding for unicode
 chore(site): update index page links
 ```
 

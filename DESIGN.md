@@ -2,7 +2,8 @@
 
 The shared design language for every tool on `tools.wisefowl.org`. Read this
 before building a new tool so the whole collection reads as one thing. Distilled
-from the PDF Compressor, the first tool built to these conventions.
+from the Media Compressor (originally the PDF Compressor), the first tool
+built to these conventions.
 
 ## Philosophy
 
@@ -116,6 +117,6 @@ Reusable patterns. Copy the ones you need; keep the class names.
   parses `type(scope): message` and renders the scope as a badge:
   ```
   feat(media-clipper): add gif export
-  fix(pdf-compressor): correct unicode filename encoding
+  fix(media-compressor): correct unicode filename encoding
   ```
 - Deployed by Cloudflare Pages on push to `main` — no build, output dir `/`.
