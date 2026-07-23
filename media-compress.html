@@ -134,6 +134,23 @@
             color: #2563eb;
             background: #eff6ff;
         }
+        .format-selector { display: flex; gap: 0.5rem; margin: 0.5rem 0 0.75rem; }
+        .format-selector[hidden] { display: none; }
+        .format-btn {
+            flex: 1;
+            padding: 0.4rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #6b7280;
+        }
+        .format-btn.active {
+            border-color: #2563eb;
+            color: #2563eb;
+            background: #eff6ff;
+        }
     </style>
 </head>
 <body>
@@ -165,6 +182,13 @@
         <div class="mode-selector">
             <button class="mode-btn active" data-mode="combined" type="button">One PDF</button>
             <button class="mode-btn" data-mode="separate" type="button">Separate PDFs</button>
+        </div>
+
+        <div class="format-selector" id="image-format-selector" hidden>
+            <button class="format-btn active" data-format="keep" type="button">Keep type</button>
+            <button class="format-btn" data-format="jpg" type="button">JPG</button>
+            <button class="format-btn" data-format="webp" type="button">WEBP</button>
+            <button class="format-btn" data-format="pdf" type="button">PDF</button>
         </div>
 
         <button id="create-btn" type="button">Create PDF</button>
@@ -211,6 +235,7 @@
         let nextId = 0;
         let activeLevel = 'medium';
         let activeMode = 'combined';
+        let activeImageFormat = 'keep';
         let outputUrls = [];
 
         function trackUrl(url) { outputUrls.push(url); return url; }
@@ -235,6 +260,7 @@
         const sizeComp      = document.getElementById('size-comparison');
         const fileList      = document.getElementById('file-list');
         const openInEl      = document.getElementById('open-in');
+        const imageFormatSelector = document.getElementById('image-format-selector');
 
         // Editable output filename. The base is user-editable; the extension is
         // fixed so it can't be broken. The <a download> updates as they type.
@@ -324,6 +350,8 @@
             pageCountSum.textContent = `(${queue.length} file${queue.length !== 1 ? 's' : ''}, ~${pages} page${pages !== 1 ? 's' : ''})`;
             memWarn.hidden = pages <= 40;
 
+            imageFormatSelector.hidden = !(activeMode === 'separate' && queue.some(x => x.type === 'image'));
+
             queueList.innerHTML = '';
             queue.forEach((item, i) => {
                 const li = document.createElement('li');
@@ -370,7 +398,17 @@
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             activeMode = btn.dataset.mode;
-            createBtn.textContent = activeMode === 'combined' ? 'Create PDF' : 'Create PDFs';
+            createBtn.textContent = activeMode === 'combined' ? 'Create PDF' : 'Compress';
+            renderQueue();
+        });
+
+        // Image output format selector (separate mode only)
+        document.querySelector('.format-selector').addEventListener('click', e => {
+            const btn = e.target.closest('.format-btn');
+            if (!btn) return;
+            document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            activeImageFormat = btn.dataset.format;
         });
 
         // Processing
@@ -405,6 +443,33 @@
             return { bytes: Uint8Array.from(atob(base64), c => c.charCodeAt(0)), w: canvas.width, h: canvas.height };
         }
 
+        async function imageToBlob(file, maxDim, quality, mime) {
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+            URL.revokeObjectURL(url);
+            let w = img.naturalWidth, h = img.naturalHeight;
+            if (Math.max(w, h) > maxDim) {
+                const r = maxDim / Math.max(w, h);
+                w = Math.round(w * r);
+                h = Math.round(h * r);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+            return new Promise(res => canvas.toBlob(res, mime, quality));
+        }
+
+        const IMG_EXT = { 'image/jpeg': '.jpg', 'image/webp': '.webp' };
+
+        // PNG (and anything else) can't round-trip as itself in this tool —
+        // it always rasterizes to JPEG, same limitation "Keep type" has had
+        // since the tool only ever produced JPEG-backed PDFs.
+        function keepTypeMime(inputType) {
+            return inputType === 'image/webp' ? 'image/webp' : 'image/jpeg';
+        }
+
         function compressedName(originalName, ext = '.pdf') {
             const dot = originalName.lastIndexOf('.');
             const base = dot >= 0 ? originalName.slice(0, dot) : originalName;
@@ -429,6 +494,23 @@
                 }
                 pdfDoc.destroy();
             }
+        }
+
+        async function processItemSeparate(item, cfg, level, imageFormat) {
+            const { PDFDocument } = window.PDFLib;
+            if (item.type === 'pdf' || (item.type === 'image' && imageFormat === 'pdf')) {
+                const doc = await PDFDocument.create();
+                await processItemIntoDoc(item, doc, cfg);
+                const bytes = await doc.save();
+                return { name: compressedName(item.name, '.pdf'), bytes, mime: 'application/pdf', kind: 'pdf' };
+            }
+            // item.type === 'image', native output
+            const mime = imageFormat === 'keep' ? keepTypeMime(item.file.type)
+                       : imageFormat === 'jpg'  ? 'image/jpeg'
+                       : 'image/webp';
+            const blob = await imageToBlob(item.file, cfg.imgMaxDim, cfg.jpeg, mime);
+            const bytes = new Uint8Array(await blob.arrayBuffer());
+            return { name: compressedName(item.name, IMG_EXT[mime]), bytes, mime, kind: 'image' };
         }
 
         createBtn.addEventListener('click', async () => {
@@ -474,7 +556,7 @@
                         : `${inMB} MB → ${outMB} MB`;
                     WFHandoff.showOpenIn(openInEl, { blob, name: outName, kind: 'pdf' });
                 } else {
-                    // Separate mode: one PDF per input file.
+                    // Separate mode: native output per input file.
                     // Provide both a combined ZIP and individual download links.
                     const zip = new window.JSZip();
                     const outputs = [];
@@ -483,13 +565,10 @@
                     for (const item of valid) {
                         processed++;
                         statusMsg.textContent = `Processing ${item.name}… (${processed}/${valid.length})`;
-                        const doc = await PDFDocument.create();
-                        await processItemIntoDoc(item, doc, cfg);
-                        const pdfBytes = await doc.save();
-                        totalOutputBytes += pdfBytes.byteLength;
-                        const name = compressedName(item.name);
-                        zip.file(name, pdfBytes);
-                        outputs.push({ name, bytes: pdfBytes, mime: 'application/pdf', kind: 'pdf' });
+                        const out = await processItemSeparate(item, cfg, activeLevel, activeImageFormat);
+                        totalOutputBytes += out.bytes.byteLength;
+                        zip.file(out.name, out.bytes);
+                        outputs.push(out);
                     }
                     statusMsg.textContent = 'Creating ZIP…';
                     const zipBytes = await zip.generateAsync({ type: 'uint8array' });

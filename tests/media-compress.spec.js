@@ -25,7 +25,7 @@ test('combined mode produces one PDF', async ({ page }) => {
   await expect(page.locator('#file-list')).toBeHidden();
 });
 
-test('separate mode offers a ZIP plus individual downloads', async ({ page }) => {
+test('separate mode offers a ZIP plus individual downloads, native format by default', async ({ page }) => {
   await attachImages(page, 3);
   await page.click('.mode-btn[data-mode="separate"]');
   await page.click('#create-btn');
@@ -38,7 +38,35 @@ test('separate mode offers a ZIP plus individual downloads', async ({ page }) =>
   // One individual download link per input file.
   await expect(page.locator('#file-list')).toBeVisible();
   await expect(page.locator('#file-list a')).toHaveCount(3);
+  await expect(page.locator('#file-list a').first()).toHaveAttribute('download', /-compressed\.jpg$/);
+});
+
+test('separate mode can force images to WEBP', async ({ page }) => {
+  await attachImages(page, 2);
+  await page.click('.mode-btn[data-mode="separate"]');
+  await page.click('.format-btn[data-format="webp"]');
+  await page.click('#create-btn');
+  await expect(page.locator('#output-section')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('#file-list a')).toHaveCount(2);
+  await expect(page.locator('#file-list a').first()).toHaveAttribute('download', /-compressed\.webp$/);
+});
+
+test('separate mode can still force PDF output for images', async ({ page }) => {
+  await attachImages(page, 2);
+  await page.click('.mode-btn[data-mode="separate"]');
+  await page.click('.format-btn[data-format="pdf"]');
+  await page.click('#create-btn');
+  await expect(page.locator('#output-section')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('#file-list a').first()).toHaveAttribute('download', /-compressed\.pdf$/);
+});
+
+test('image format selector only shows in separate mode with images queued', async ({ page }) => {
+  await attachImages(page, 1);
+  await expect(page.locator('#image-format-selector')).toBeHidden();
+  await page.click('.mode-btn[data-mode="separate"]');
+  await expect(page.locator('#image-format-selector')).toBeVisible();
+  await page.click('.mode-btn[data-mode="combined"]');
+  await expect(page.locator('#image-format-selector')).toBeHidden();
 });
 
 test('lets you rename the output before downloading', async ({ page }) => {
