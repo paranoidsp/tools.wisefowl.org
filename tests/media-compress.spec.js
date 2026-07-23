@@ -2,7 +2,7 @@ const { test, expect } = require('./helpers/fixtures');
 const { attachImages, attachPdf } = require('./helpers/gen');
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/pdf-compress.html');
+  await page.goto('/media-compress.html');
   await expect(page.locator('#drop-zone')).toBeVisible();
 });
 

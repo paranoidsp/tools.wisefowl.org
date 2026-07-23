@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Compressor — Wisefowl Tools</title>
+    <title>Media Compressor — Wisefowl Tools</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🦆</text></svg>">
     <link rel="stylesheet" href="style.css">
     <style>
@@ -139,8 +139,8 @@
 <body>
     <header>
         <div>
-            <h1>PDF Compressor</h1>
-            <p class="subtitle">Compress images and PDFs. Combined or separate. Files never leave your device.</p>
+            <h1>Media Compressor</h1>
+            <p class="subtitle">Compress images, PDFs, and video. Combined or separate. Files never leave your device.</p>
         </div>
         <a class="private-link" href="/">← Tools</a>
     </header>
@@ -181,6 +181,7 @@
             </span>
             <a id="download-link" class="download-btn" href="#" download>Download</a>
             <span id="size-comparison"></span>
+            <span id="open-in" class="open-in" hidden></span>
         </div>
         <ul id="file-list" hidden></ul>
     </section>
@@ -192,6 +193,7 @@
 
     <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    <script src="handoff.js"></script>
     <script type="module">
         import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.min.mjs';
         pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -232,6 +234,7 @@
         const filenameExt   = document.getElementById('filename-ext');
         const sizeComp      = document.getElementById('size-comparison');
         const fileList      = document.getElementById('file-list');
+        const openInEl      = document.getElementById('open-in');
 
         // Editable output filename. The base is user-editable; the extension is
         // fixed so it can't be broken. The <a download> updates as they type.
@@ -469,6 +472,7 @@
                     sizeComp.textContent = pct > 0
                         ? `${inMB} MB → ${outMB} MB (${pct}% smaller)`
                         : `${inMB} MB → ${outMB} MB`;
+                    WFHandoff.showOpenIn(openInEl, { blob, name: outName, kind: 'pdf' });
                 } else {
                     // Separate mode: one PDF per input file.
                     // Provide both a combined ZIP and individual download links.
@@ -485,7 +489,7 @@
                         totalOutputBytes += pdfBytes.byteLength;
                         const name = compressedName(item.name);
                         zip.file(name, pdfBytes);
-                        outputs.push({ name, bytes: pdfBytes });
+                        outputs.push({ name, bytes: pdfBytes, mime: 'application/pdf', kind: 'pdf' });
                     }
                     statusMsg.textContent = 'Creating ZIP…';
                     const zipBytes = await zip.generateAsync({ type: 'uint8array' });
@@ -499,7 +503,7 @@
                     fileList.innerHTML = '<li class="files-caption">Or download files individually:</li>';
                     for (const out of outputs) {
                         const url = trackUrl(URL.createObjectURL(
-                            new Blob([out.bytes], { type: 'application/pdf' })));
+                            new Blob([out.bytes], { type: out.mime })));
                         const li = document.createElement('li');
                         const a = document.createElement('a');
                         a.href = url;
@@ -519,6 +523,16 @@
                     sizeComp.textContent = pct > 0
                         ? `${inMB} MB → ${outMB} MB (${pct}% smaller)`
                         : `${inMB} MB → ${outMB} MB`;
+
+                    if (outputs.length === 1) {
+                        WFHandoff.showOpenIn(openInEl, {
+                            blob: new Blob([outputs[0].bytes], { type: outputs[0].mime }),
+                            name: outputs[0].name,
+                            kind: outputs[0].kind,
+                        });
+                    } else {
+                        openInEl.hidden = true;
+                    }
                 }
 
                 outputSection.hidden = false;
@@ -528,6 +542,11 @@
             } finally {
                 createBtn.disabled = false;
             }
+        });
+
+        WFHandoff.receive({
+            image: f => addFiles([f]),
+            pdf:   f => addFiles([f]),
         });
     </script>
 </body>

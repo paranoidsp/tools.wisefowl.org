@@ -21,9 +21,9 @@ test('offers compatible targets and excludes the current tool', async ({ page })
   expect(await targetsFor(page, 'video', 'video/mp4')).toEqual(['Media Clipper']);
 });
 
-test('an image output only offers Audio to Video', async ({ page }) => {
+test('an image output offers Audio to Video and Media Compressor', async ({ page }) => {
   await page.goto('/media-clip.html');
-  expect(await targetsFor(page, 'image', 'image/gif')).toEqual(['Audio to Video']);
+  expect(await targetsFor(page, 'image', 'image/gif')).toEqual(['Audio to Video', 'Media Compressor']);
 });
 
 test('ignores a stale record when the page was not opened via handoff', async ({ page }) => {

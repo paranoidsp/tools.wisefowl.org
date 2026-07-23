@@ -12,9 +12,10 @@
   // Which tools accept which kinds of file. The "Send to" menu is derived from
   // this, so a source only ever offers targets that can actually use its output.
   const TOOLS = [
-    { file: 'media-clip.html',  name: 'Media Clipper',  accepts: ['audio', 'video'] },
-    { file: 'audio-merge.html', name: 'Audio Merge',    accepts: ['audio'] },
-    { file: 'audio-video.html', name: 'Audio to Video', accepts: ['image', 'audio'] },
+    { file: 'media-clip.html',    name: 'Media Clipper',    accepts: ['audio', 'video'] },
+    { file: 'audio-merge.html',   name: 'Audio Merge',      accepts: ['audio'] },
+    { file: 'audio-video.html',   name: 'Audio to Video',   accepts: ['image', 'audio'] },
+    { file: 'media-compress.html', name: 'Media Compressor', accepts: ['image', 'pdf'] },
   ];
 
   const IMAGE_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif'];
