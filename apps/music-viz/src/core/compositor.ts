@@ -175,8 +175,13 @@ export class Compositor {
     this.container = null;
   }
 
+  private fitAspect: PostSettings['aspect'] | null = null;
+  private fitScale = 0;
+
   private fit() {
     if (!this.container) return;
+    this.fitAspect = this.source.doc().post.aspect;
+    this.fitScale = this.source.doc().post.renderScale;
     const r = this.container.getBoundingClientRect();
     const aspect = ASPECTS[this.source.doc().post.aspect];
     let w = r.width;
@@ -345,7 +350,9 @@ export class Compositor {
     const time = (now - this.startT) / 1000;
 
     const doc = this.source.doc();
-    if (this.container) this.fit();
+    // re-fit only when something that affects stage size changed (resizes are
+    // handled by the ResizeObserver) — getBoundingClientRect forces layout.
+    if (this.container && (doc.post.aspect !== this.fitAspect || doc.post.renderScale !== this.fitScale)) this.fit();
     const audio = this.source.features();
     const color = this.colorMapper(doc.color);
     const { ctx, canvas } = this;
