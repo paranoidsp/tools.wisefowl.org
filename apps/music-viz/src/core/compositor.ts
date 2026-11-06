@@ -51,6 +51,8 @@ interface LayerRuntime {
   errorAt: number;
   /** effective params from the last rendered frame */
   lastParams: ParamValues | null;
+  /** webgl layers: small 2D copy taken right after render (WebGL buffers can't be read later) */
+  thumb: HTMLCanvasElement | null;
 }
 
 export interface CompositorStats {
@@ -145,6 +147,7 @@ export class Compositor {
   private fpsAcc = 0;
   private fpsFrames = 0;
   private hasFilter = supportsCtxFilter();
+  private frameCount = 0;
   /** cap on devicePixelRatio (gallery thumbnails use 1) */
   maxDpr: number;
   stats: CompositorStats = { fps: 0, frameMs: 0, layers: 0, errors: {} };
@@ -231,9 +234,34 @@ export class Compositor {
     return this.runtimes.get(layerId)?.lastParams ?? null;
   }
 
-  /** The layer's own canvas (pre-composite) — for layer-panel thumbnails. */
+  /**
+   * The layer's own canvas (pre-composite) — for layer-panel thumbnails.
+   * For webgl layers this is a small 2D copy refreshed every few frames,
+   * since a WebGL drawing buffer can't be read outside the frame it was drawn in.
+   */
   layerCanvas(layerId: string): HTMLCanvasElement | null {
-    return this.runtimes.get(layerId)?.canvas ?? null;
+    const rt = this.runtimes.get(layerId);
+    if (!rt) return null;
+    return rt.ctx ? rt.canvas : rt.thumb;
+  }
+
+  /** Seconds on the compositor clock (the `time` handed to visualizations and LFOs). */
+  time(): number {
+    return (performance.now() - this.startT) / 1000;
+  }
+
+  private updateThumb(rt: LayerRuntime) {
+    if (!rt.canvas.width || !rt.canvas.height) return;
+    if (!rt.thumb) rt.thumb = document.createElement('canvas');
+    const tw = 160;
+    const th = Math.max(1, Math.round((tw * rt.canvas.height) / rt.canvas.width));
+    if (rt.thumb.width !== tw || rt.thumb.height !== th) {
+      rt.thumb.width = tw;
+      rt.thumb.height = th;
+    }
+    const g = rt.thumb.getContext('2d')!;
+    g.clearRect(0, 0, tw, th);
+    g.drawImage(rt.canvas, 0, 0, tw, th);
   }
 
   /** Last error thrown by a layer's visualization, if any. */
@@ -281,7 +309,7 @@ export class Compositor {
       this.stats.errors[layer.id] = String(e);
       return null;
     }
-    const rt: LayerRuntime = { vizId: def.id, def, inst, canvas, ctx, w: 0, h: 0, modState: {}, error: null, errorAt: 0, lastParams: null };
+    const rt: LayerRuntime = { vizId: def.id, def, inst, canvas, ctx, w: 0, h: 0, modState: {}, error: null, errorAt: 0, lastParams: null, thumb: null };
     this.runtimes.set(layer.id, rt);
     this.sizeRuntime(rt);
     return rt;
@@ -376,6 +404,7 @@ export class Compositor {
         this.stats.errors[layer.id] = rt.error;
       }
       rt.ctx?.restore();
+      if (!rt.ctx && this.frameCount % 8 === 0) this.updateThumb(rt);
 
       // composite
       const tf = layer.transform;
@@ -395,6 +424,7 @@ export class Compositor {
     if (post.vignette > 0) this.applyVignette(post.vignette);
     if (post.grain > 0) this.applyGrain(post.grain);
 
+    this.frameCount++;
     // stats
     const ms = performance.now() - t0;
     this.stats.frameMs = this.stats.frameMs * 0.9 + ms * 0.1;
