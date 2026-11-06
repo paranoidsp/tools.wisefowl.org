@@ -49,6 +49,8 @@ interface LayerRuntime {
   modState: Record<string, number>;
   error: string | null;
   errorAt: number;
+  /** effective params from the last rendered frame */
+  lastParams: ParamValues | null;
 }
 
 export interface CompositorStats {
@@ -224,6 +226,21 @@ export class Compositor {
     for (const id of [...this.runtimes.keys()]) this.disposeRuntime(id);
   }
 
+  /** Effective (modulated) params of a layer as of the last frame — for live UI readouts. */
+  effectiveParams(layerId: string): ParamValues | null {
+    return this.runtimes.get(layerId)?.lastParams ?? null;
+  }
+
+  /** The layer's own canvas (pre-composite) — for layer-panel thumbnails. */
+  layerCanvas(layerId: string): HTMLCanvasElement | null {
+    return this.runtimes.get(layerId)?.canvas ?? null;
+  }
+
+  /** Last error thrown by a layer's visualization, if any. */
+  layerError(layerId: string): string | null {
+    return this.stats.errors[layerId] ?? null;
+  }
+
   async snapshot(type = 'image/png'): Promise<Blob | null> {
     return new Promise((res) => this.canvas.toBlob(res, type));
   }
@@ -264,7 +281,7 @@ export class Compositor {
       this.stats.errors[layer.id] = String(e);
       return null;
     }
-    const rt: LayerRuntime = { vizId: def.id, def, inst, canvas, ctx, w: 0, h: 0, modState: {}, error: null, errorAt: 0 };
+    const rt: LayerRuntime = { vizId: def.id, def, inst, canvas, ctx, w: 0, h: 0, modState: {}, error: null, errorAt: 0, lastParams: null };
     this.runtimes.set(layer.id, rt);
     this.sizeRuntime(rt);
     return rt;
@@ -328,6 +345,7 @@ export class Compositor {
       // back off a failing layer for a second instead of spamming errors
       if (rt.error && now - rt.errorAt < 1000) continue;
       const params = applyModulation(rt.def.params, layer.params, layer.modulations, audio, time, rt.modState);
+      rt.lastParams = params;
 
       if (rt.ctx) {
         const c = rt.ctx;
