@@ -1,6 +1,6 @@
 ---
 created: 2026-11-06 18:04:41
-updated: 2026-11-06 18:20:00
+updated: 2026-11-06 18:40:00
 creators: [human, claude-opus-5-5]
 type: plan
 status: active
@@ -70,11 +70,14 @@ a fixed visualizer.
 
 - **Stack**: Vite + React 19 + TypeScript + zustand; Canvas2D for 2D
   visualizations; three.js for 3D visualizations.
-- **Deploy**: source in `apps/music-viz/`, built with `npm run build` into
-  `/music-viz/` at the repo root. The built output is committed, because the
-  Pages project has no build step. This is a deliberate exception to
-  `DESIGN.md`'s "no build step" principle: an editor this size needs a
-  component framework.
+- **Deploy**: the tools site now has a build step (approved 2026-11-06).
+  `npm run build` at the repo root (`scripts/build.mjs`) builds every
+  `apps/<name>/` with Vite into `/<name>/` (gitignored), then copies the site
+  into `dist/`, leaving out dev-only files. The Pages project's `build_config`
+  (build `npm run build`, output `dist`) lives in Terraform
+  (`tf-resources/wisefowl-org.tf`). The existing Web Analytics tag/token are
+  kept via `ignore_changes`. CI builds before running Playwright. Node 22 is
+  set in `.node-version`.
 - **Contracts** (`src/core/`):
   - `types.ts` defines `AudioFeatures`, `ParamSpec`, `VizDefinition`, `Layer`,
     `Scene`, `ColorMapper` and `ProjectFile`.
@@ -115,3 +118,8 @@ screenshots), add a smoke test to the site's suite, build, and deploy.
   built output.
 - **2026-11-06 18:20** — Wrote the core contracts, store, compositor, stubs
   and the reference viz. Typecheck and build pass. Dispatched five agents.
+- **2026-11-06 18:40** — Karthik OK'd a build step. Switched from committing
+  the built output to a Pages build: added `scripts/build.mjs`,
+  `.node-version`, the CI build step and `build_config` in Terraform (plan
+  checked; apply waits until the app is on main). Fixed the test static
+  server to resolve `dir/` to `index.html`, as Pages does.

@@ -3,3 +3,6 @@ node_modules/
 test-results/
 playwright-report/
 .claude/
+/dist/
+# built from apps/music-viz by `npm run build`
+/music-viz/
