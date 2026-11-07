@@ -11,6 +11,7 @@ import { IconCube, IconLayers, IconPlus, IconReset, IconSquare, IconWarn } from 
 import { Dropdown } from '../Popover';
 import { useUi } from '../uiStore';
 import { Row } from '../controls/basic';
+import { LAYER_HELP, TRANSFORM_HELP } from '../help';
 
 export function LayerInspector() {
   const layer = useStore(selectedLayer);
@@ -101,6 +102,7 @@ export function LayerInspector() {
         <p className="insp-head__desc">{def.description}</p>
         <div className="insp-head__row">
           {presets.length > 0 && (
+            <div className="dropdown--grow" style={{ display: 'flex', minWidth: 0 }} data-tip={LAYER_HELP.presets}>
             <Dropdown<number>
               className="dropdown--grow"
               value={-1}
@@ -110,8 +112,9 @@ export function LayerInspector() {
               ariaLabel="Apply preset"
               wide
             />
+            </div>
           )}
-          <button className="btn btn--ghost btn--sm" onClick={() => s.resetLayerParams(id)} data-tip="Reset parameters and modulation to defaults">
+          <button className="btn btn--ghost btn--sm" onClick={() => s.resetLayerParams(id)} data-tip={LAYER_HELP.reset}>
             <IconReset size={13} /> Reset
           </button>
         </div>
@@ -122,14 +125,14 @@ export function LayerInspector() {
       </div>
 
       <Section title="Layer" storageKey="layer">
-        <Row label="Blend">
+        <Row label="Blend" hint={LAYER_HELP.blend}>
           <Dropdown<BlendMode> value={layer.blend} options={BLEND_MODES} onChange={(blend) => s.updateLayer(id, { blend })} ariaLabel="Blend mode" />
         </Row>
-        <NumberControl label="Opacity" value={layer.opacity} min={0} max={1} step={0.01} defaultValue={1} onChange={(opacity) => s.updateLayer(id, { opacity })} format={(v) => `${Math.round(v * 100)}%`} />
+        <NumberControl label="Opacity" hint={LAYER_HELP.opacity} value={layer.opacity} min={0} max={1} step={0.01} defaultValue={1} onChange={(opacity) => s.updateLayer(id, { opacity })} format={(v) => `${Math.round(v * 100)}%`} />
         {def.renderer === 'canvas2d' && (
           <NumberControl
             label="Trails"
-            hint="Layer feedback: 0 clears every frame, higher leaves longer trails"
+            hint={LAYER_HELP.trails}
             value={layer.feedback}
             min={0}
             max={0.99}
@@ -141,10 +144,10 @@ export function LayerInspector() {
       </Section>
 
       <Section title="Transform" storageKey="transform" defaultOpen={false}>
-        <NumberControl label="X" value={tf.x} min={-1} max={1} step={0.01} defaultValue={0} bipolar onChange={(x) => s.updateLayer(id, { transform: { ...tf, x } })} />
-        <NumberControl label="Y" value={tf.y} min={-1} max={1} step={0.01} defaultValue={0} bipolar onChange={(y) => s.updateLayer(id, { transform: { ...tf, y } })} />
-        <NumberControl label="Scale" value={tf.scale} min={0.1} max={4} step={0.01} curve="log" defaultValue={1} unit="×" onChange={(scale) => s.updateLayer(id, { transform: { ...tf, scale } })} />
-        <NumberControl label="Rotation" value={tf.rotation} min={-180} max={180} step={1} defaultValue={0} unit="°" bipolar onChange={(rotation) => s.updateLayer(id, { transform: { ...tf, rotation } })} />
+        <NumberControl label="X" hint={TRANSFORM_HELP.x} value={tf.x} min={-1} max={1} step={0.01} defaultValue={0} bipolar onChange={(x) => s.updateLayer(id, { transform: { ...tf, x } })} />
+        <NumberControl label="Y" hint={TRANSFORM_HELP.y} value={tf.y} min={-1} max={1} step={0.01} defaultValue={0} bipolar onChange={(y) => s.updateLayer(id, { transform: { ...tf, y } })} />
+        <NumberControl label="Scale" hint={TRANSFORM_HELP.scale} value={tf.scale} min={0.1} max={4} step={0.01} curve="log" defaultValue={1} unit="×" onChange={(scale) => s.updateLayer(id, { transform: { ...tf, scale } })} />
+        <NumberControl label="Rotation" hint={TRANSFORM_HELP.rotation} value={tf.rotation} min={-180} max={180} step={1} defaultValue={0} unit="°" bipolar onChange={(rotation) => s.updateLayer(id, { transform: { ...tf, rotation } })} />
       </Section>
 
       {groups.map((g) => (

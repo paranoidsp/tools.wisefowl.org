@@ -173,7 +173,10 @@ export const useStore = create<StoreState>()((set, get) => {
     setTab: (tab) => set({ tab }),
     setInspectorTab: (inspectorTab) => set({ inspectorTab }),
     setFocusMode: (focusMode) => set({ focusMode }),
-    select: (selectedId) => set({ selectedId, inspectorTab: selectedId ? 'layer' : get().inspectorTab }),
+    // Jump to the Layer tab only when a *different* layer is picked, so clicking
+    // the current layer (or dragging it) doesn't yank you out of Mapping/Scene.
+    select: (selectedId) =>
+      set({ selectedId, inspectorTab: selectedId && selectedId !== get().selectedId ? 'layer' : get().inspectorTab }),
 
     addLayer: (vizId, presetIndex) => {
       const def = getViz(vizId);

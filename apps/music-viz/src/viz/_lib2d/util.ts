@@ -101,13 +101,23 @@ export function paletteParams(group = 'Colour', def: PaletteMode = 'mapping', ex
     level: 'Palette by level',
     mono: 'Mono (single colour)',
   };
+  const hints: Record<PaletteMode, string> = {
+    mapping: 'Each element is coloured by its frequency through the global mapping, so octave relationships show up as colour.',
+    pitch: 'Coloured by note name only (C, C♯, D…), ignoring the octave: every A is the same colour.',
+    position: 'Sweeps the palette across the element’s position on screen, independent of what’s playing.',
+    level: 'Colour follows loudness: quiet elements take the low end of the palette, loud ones the high end.',
+    mono: 'One fixed colour (pick it below), with brightness from the level.',
+  };
   return [
     {
       key: 'palette', label: 'Palette', type: 'select', default: def, group,
-      hint: 'Where colours come from. "Mapping" uses the global colour mapping of each element’s frequency.',
-      options: extra.map((v) => ({ value: v, label: labels[v] })),
+      hint: 'Where this layer’s colours come from. The mapping options run each element’s frequency through the global colour mapping (Mapping tab), so changing the mapping recolours it; the others ignore pitch.',
+      options: extra.map((v) => ({ value: v, label: labels[v], hint: hints[v] })),
     },
-    { key: 'monoColor', label: 'Mono colour', type: 'color', default: '#9fd8ff', group, hint: 'Used when Palette = Mono' },
+    {
+      key: 'monoColor', label: 'Mono colour', type: 'color', default: '#9fd8ff', group,
+      hint: 'The single colour used when Palette is Mono. Brightness still follows the level, so shape and motion carry the music on their own: a good way to see what the colour mapping adds.',
+    },
   ];
 }
 

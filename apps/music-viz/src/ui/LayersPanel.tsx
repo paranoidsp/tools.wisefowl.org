@@ -147,7 +147,7 @@ export function LayersPanel() {
             <p className="muted">Layers stack like in an image editor. Each one is a visualization with its own parameters.</p>
           </div>
         ) : null}
-        <button className="layers__add" onClick={() => useUi.getState().setPickerOpen(true)}>
+        <button className="layers__add" onClick={() => useUi.getState().setPickerOpen(true)} data-tip="Pick a visualization to stack on top" data-tip-kbd="A">
           <IconPlus size={14} />
           <span>Add layer</span>
         </button>
@@ -235,7 +235,7 @@ function LayerRow(p: RowProps) {
         className="icon-btn icon-btn--sm layer-row__more"
         onClick={() => moreRef.current && p.onMore(moreRef.current)}
         aria-label="Layer actions"
-        data-tip="More"
+        data-tip="Layer actions: rename, duplicate, reorder, delete"
       >
         <IconMore size={14} />
       </button>

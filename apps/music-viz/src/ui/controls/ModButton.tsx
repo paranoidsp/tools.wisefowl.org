@@ -7,6 +7,7 @@ import { stage } from '../../core/stage';
 import { getLatestFeatures } from '../liveFeatures';
 import { Popover } from '../Popover';
 import { NumberControl } from './NumberControl';
+import { MOD_HELP } from '../help';
 
 interface Props {
   label: string;
@@ -69,7 +70,7 @@ function ModPanel({ label, mod, onChange, onClose }: Props & { onClose(): void }
   }, []);
 
   const pick = (id: ModSource) => onChange(mod ? { ...mod, source: id } : { source: id, amount: 0.5, smooth: 0.3 });
-  const hint = mod ? BY_ID[mod.source]?.hint : 'Pick a source. The value then moves with it, scaled by Amount.';
+  const hint = mod ? `${BY_ID[mod.source]?.label}: ${BY_ID[mod.source]?.hint}` : MOD_HELP.pick;
 
   return (
     <div className="modpanel">
@@ -92,6 +93,7 @@ function ModPanel({ label, mod, onChange, onClose }: Props & { onClose(): void }
           </button>
         )}
       </div>
+      <div className="modpanel__hint">{MOD_HELP.header}</div>
       {SOURCE_GROUPS.map((g) => (
         <div key={g.title} className="modpanel__group">
           <div className="modpanel__glabel">{g.title}</div>
@@ -112,6 +114,7 @@ function ModPanel({ label, mod, onChange, onClose }: Props & { onClose(): void }
         <div className="modpanel__controls">
           <NumberControl
             label="Amount"
+            hint={MOD_HELP.amount}
             value={mod.amount}
             min={-1}
             max={1}
@@ -123,6 +126,7 @@ function ModPanel({ label, mod, onChange, onClose }: Props & { onClose(): void }
           />
           <NumberControl
             label="Smoothing"
+            hint={MOD_HELP.smooth}
             value={mod.smooth}
             min={0}
             max={0.99}

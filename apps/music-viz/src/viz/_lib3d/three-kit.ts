@@ -84,12 +84,12 @@ export interface CameraDefaults {
 /** Standard auto-orbit camera controls (group "Camera"). */
 export function cameraParams(d: CameraDefaults): ParamSpec[] {
   return [
-    { key: 'camSpeed', label: 'Orbit speed', type: 'number', min: -60, max: 60, step: 0.5, default: d.speed, unit: '°/s', group: 'Camera', hint: 'Auto-orbit around the scene; negative = reverse, 0 = still' },
-    { key: 'camAngle', label: 'Azimuth offset', type: 'number', min: -180, max: 180, step: 1, default: 0, unit: '°', group: 'Camera' },
-    { key: 'camDistance', label: 'Distance', type: 'number', min: 1, max: d.maxDistance ?? 40, step: 0.1, default: d.distance, group: 'Camera', hint: 'Try modulating with bass for a breathing zoom' },
-    { key: 'camElevation', label: 'Elevation', type: 'number', min: -89, max: 89, step: 1, default: d.elevation, unit: '°', group: 'Camera' },
-    { key: 'camFov', label: 'Field of view', type: 'number', min: 15, max: 110, step: 1, default: d.fov, unit: '°', group: 'Camera' },
-    { key: 'camSway', label: 'Sway', type: 'number', min: 0, max: 1, step: 0.01, default: 0.15, group: 'Camera', hint: 'Slow drifting bob so a still camera feels alive' },
+    { key: 'camSpeed', label: 'Orbit speed', type: 'number', min: -60, max: 60, step: 0.5, default: d.speed, unit: '°/s', group: 'Camera', hint: 'How fast the camera circles the scene, in degrees per second. Negative orbits the other way; 0 holds still so you can set the view with Azimuth offset.' },
+    { key: 'camAngle', label: 'Azimuth offset', type: 'number', min: -180, max: 180, step: 1, default: 0, unit: '°', group: 'Camera', hint: 'Turns the camera to a different side of the scene, added on top of the auto-orbit. With Orbit speed at 0 this picks a fixed viewing side.' },
+    { key: 'camDistance', label: 'Distance', type: 'number', min: 1, max: d.maxDistance ?? 40, step: 0.1, default: d.distance, group: 'Camera', hint: 'How far the camera sits from the centre, in scene units. Try binding this to Bass (⦿) with a small negative amount so the view pushes in on every kick.' },
+    { key: 'camElevation', label: 'Elevation', type: 'number', min: -89, max: 89, step: 1, default: d.elevation, unit: '°', group: 'Camera', hint: 'Camera height as an angle above (positive) or below (negative) the horizon. Near 90° you look straight down on the scene, like a map.' },
+    { key: 'camFov', label: 'Field of view', type: 'number', min: 15, max: 110, step: 1, default: d.fov, unit: '°', group: 'Camera', hint: 'Field of view: how wide the lens is. Low values act like a telephoto (flat, little depth); high values are wide-angle, with near things looming and strong perspective.' },
+    { key: 'camSway', label: 'Sway', type: 'number', min: 0, max: 1, step: 0.01, default: 0.15, group: 'Camera', hint: 'Adds a slow, gentle drift to the camera angle and height (independent of the music), so even a still camera feels hand-held and alive. 0 = locked.' },
   ];
 }
 

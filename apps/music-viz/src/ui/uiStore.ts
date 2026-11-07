@@ -15,6 +15,9 @@ interface UiState {
   pickerOpen: boolean;
   drawer: 'left' | 'right' | null;
   renamingId: string | null;
+  /** print each setting's explanation under it (learning mode) */
+  showDescriptions: boolean;
+  setShowDescriptions(on: boolean): void;
   setPickerOpen(on: boolean): void;
   setDrawer(d: 'left' | 'right' | null): void;
   setRenaming(id: string | null): void;
@@ -27,6 +30,11 @@ export const useUi = create<UiState>()((set) => ({
   pickerOpen: false,
   drawer: null,
   renamingId: null,
+  showDescriptions: localStorage.getItem('mvs:showDescriptions') === '1',
+  setShowDescriptions: (showDescriptions) => {
+    localStorage.setItem('mvs:showDescriptions', showDescriptions ? '1' : '0');
+    set({ showDescriptions });
+  },
   setPickerOpen: (pickerOpen) => set({ pickerOpen }),
   setDrawer: (drawer) => set({ drawer }),
   setRenaming: (renamingId) => set({ renamingId }),

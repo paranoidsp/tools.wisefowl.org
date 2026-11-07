@@ -23,7 +23,12 @@ export interface EngineState {
   duration: number;
   playing: boolean;
   loading: boolean;
+  /** what's happening while loading, e.g. "Decoding “song.mp3” (8.1 MB)…" */
+  loadingLabel: string | null;
+  /** last failure, written for people (why it failed + what to do). Cleared by the next successful load or dismissMessage(). */
   error: string | null;
+  /** non-blocking heads-up (e.g. "this file is silent", "sound is blocked until you press Play") */
+  notice: string | null;
   volume: number;
   loop: boolean;
   /** available once a file/demo has been decoded */
@@ -44,10 +49,22 @@ export interface AudioEngineApi {
   /** current playhead, seconds (cheap; call from rAF) */
   currentTime(): number;
 
-  loadFile(file: File): Promise<void>;
+  /**
+   * Load a file. The current track keeps playing until the new one has
+   * decoded; on failure it's left untouched and `state.error` explains why.
+   * Resolves true if the file was loaded.
+   */
+  loadFile(file: File): Promise<boolean>;
   /** procedurally synthesized demo tracks, so the tool works with no file */
   readonly demos: DemoTrack[];
-  loadDemo(id: string): Promise<void>;
+  loadDemo(id: string): Promise<boolean>;
+  /**
+   * Create/resume the AudioContext. Call synchronously inside a user gesture
+   * (click/keypress) — browsers only allow sound to start from one.
+   */
+  unlock(): void;
+  /** clear `error` and `notice` */
+  dismissMessage(): void;
   useMicrophone(): Promise<void>;
 
   play(): Promise<void>;

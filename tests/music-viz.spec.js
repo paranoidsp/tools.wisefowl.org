@@ -56,3 +56,67 @@ test('boots, plays a demo track and switches tabs without errors', async ({ page
 
   expect(errors).toEqual([]);
 });
+
+// Opening files: failures must explain themselves and never replace the
+// current track (previously a failed file silently started the demo instead).
+async function openFile(page, file) {
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: /^Open/ }).first().click(),
+  ]);
+  await chooser.setFiles(file);
+}
+
+/** A tiny valid WAV (0.5 s of a 440 Hz tone), built in Node. */
+function wav() {
+  const rate = 8000;
+  const n = rate / 2;
+  const b = Buffer.alloc(44 + n * 2);
+  b.write('RIFF', 0); b.writeUInt32LE(36 + n * 2, 4); b.write('WAVE', 8);
+  b.write('fmt ', 12); b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22);
+  b.writeUInt32LE(rate, 24); b.writeUInt32LE(rate * 2, 28); b.writeUInt16LE(2, 32); b.writeUInt16LE(16, 34);
+  b.write('data', 36); b.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++) b.writeInt16LE(Math.round(8000 * Math.sin((2 * Math.PI * 440 * i) / rate)), 44 + i * 2);
+  return b;
+}
+
+test('bad audio files explain why and keep the current track', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/music-viz/');
+  await expect(page.locator('.transport')).toBeVisible();
+
+  await openFile(page, { name: 'tone.wav', mimeType: 'audio/wav', buffer: wav() });
+  await expect(page.locator('.transport__trackname')).toHaveText('tone', { timeout: 20_000 });
+
+  const cases = [
+    { file: { name: 'empty.mp3', mimeType: 'audio/mpeg', buffer: Buffer.alloc(0) }, msg: /empty \(0 bytes\)/ },
+    { file: { name: 'song.mid', mimeType: 'audio/midi', buffer: Buffer.from('MThd') }, msg: /MIDI files contain notes/ },
+    { file: { name: 'notes.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') }, msg: /PDF document, not audio/ },
+    { file: { name: 'junk.mp3', mimeType: 'audio/mpeg', buffer: Buffer.alloc(4096, 7) }, msg: /Couldn’t decode “junk\.mp3”/ },
+  ];
+  for (const c of cases) {
+    await openFile(page, c.file);
+    await expect(page.locator('.source-msg')).toContainText(c.msg, { timeout: 20_000 });
+    // the previously loaded file is still the current track (no demo fallback)
+    await expect(page.locator('.transport__trackname')).toHaveText('tone');
+    await page.locator('.source-msg__close').click();
+    await expect(page.locator('.source-msg')).toHaveCount(0);
+  }
+});
+
+test('every setting label explains itself on hover', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/music-viz/');
+  const labels = page.locator('.inspector .ctl__label');
+  for (const tab of ['Layer', 'Mapping', 'Scene']) {
+    await page.locator('.inspector .segmented__opt', { hasText: tab }).click();
+    await expect(labels.first()).toBeVisible();
+    const missing = await labels.evaluateAll((els) =>
+      els.filter((e) => !e.getAttribute('data-tip-title')).map((e) => e.textContent.trim()),
+    );
+    expect(missing, `${tab} tab labels without an explanation`).toEqual([]);
+  }
+  await page.locator('.inspector .segmented__opt', { hasText: 'Layer' }).click();
+  await labels.filter({ hasText: 'Opacity' }).first().hover();
+  await expect(page.locator('.tooltip--rich')).toContainText('Opacity');
+});

@@ -176,19 +176,19 @@ export type ModSource =
   | 'random';
 
 export const MOD_SOURCES: { id: ModSource; label: string; hint: string }[] = [
-  { id: 'loudness', label: 'Loudness', hint: 'Perceptual loudness' },
-  { id: 'rms', label: 'RMS', hint: 'Raw signal energy' },
-  { id: 'bass', label: 'Bass', hint: '20–250 Hz energy' },
-  { id: 'mid', label: 'Mid', hint: '250 Hz–4 kHz energy' },
-  { id: 'treble', label: 'Treble', hint: '4 kHz+ energy' },
-  { id: 'beatPulse', label: 'Beat', hint: 'Jumps to 1 on each beat then decays' },
-  { id: 'flux', label: 'Flux', hint: 'How fast the spectrum is changing' },
-  { id: 'centroidNorm', label: 'Brightness', hint: 'Spectral centroid (timbre brightness)' },
-  { id: 'pitchNorm', label: 'Pitch', hint: 'Dominant pitch, low → high' },
-  { id: 'beatPhase', label: 'Beat phase', hint: 'Ramps 0→1 across each beat' },
-  { id: 'lfoSlow', label: 'LFO slow', hint: '0.1 Hz sine, independent of audio' },
-  { id: 'lfoFast', label: 'LFO fast', hint: '1 Hz sine, independent of audio' },
-  { id: 'random', label: 'Random', hint: 'Smoothed noise' },
+  { id: 'loudness', label: 'Loudness', hint: 'Overall loudness, weighted like the ear hears it and auto-levelled, so quiet and loud tracks both move it.' },
+  { id: 'rms', label: 'RMS', hint: 'Raw waveform level (root-mean-square). Follows the true amplitude, with no ear weighting or auto-levelling.' },
+  { id: 'bass', label: 'Bass', hint: 'Energy from 20–250 Hz: kick drums and bass lines.' },
+  { id: 'mid', label: 'Mid', hint: 'Energy from 250 Hz–4 kHz, where voices, guitars and most melodies live.' },
+  { id: 'treble', label: 'Treble', hint: 'Energy above 4 kHz: cymbals, hi-hats, breath and “s” sounds.' },
+  { id: 'beatPulse', label: 'Beat', hint: 'Jumps to 1 on each detected beat (a sudden rise in energy), then falls to 0 over the Beat decay time.' },
+  { id: 'flux', label: 'Flux', hint: 'Spectral flux: how much the spectrum just changed. Spikes on new notes and hits, stays low on held chords.' },
+  { id: 'centroidNorm', label: 'Brightness', hint: 'Spectral centroid, the spectrum’s centre of mass: high for bright, hissy sounds, low for dark, muffled ones.' },
+  { id: 'pitchNorm', label: 'Pitch', hint: 'The main detected note, from Min freq (0) to Max freq (1) on a log scale.' },
+  { id: 'beatPhase', label: 'Beat phase', hint: 'Ramps 0 → 1 across each beat once a tempo is found, then repeats. Good for motion that stays in time.' },
+  { id: 'lfoSlow', label: 'LFO slow', hint: 'Low-frequency oscillator: a sine wave taking 10 s per cycle, ignoring the audio. For gentle drift.' },
+  { id: 'lfoFast', label: 'LFO fast', hint: 'A sine wave cycling once per second, ignoring the audio. For steady pulsing.' },
+  { id: 'random', label: 'Random', hint: 'Smooth wandering noise, ignoring the audio. For organic, unpredictable movement.' },
 ];
 
 // ─────────────────────────────────────────────────────────────── params ──
@@ -200,6 +200,11 @@ interface ParamBase {
   label: string;
   /** groups render as collapsible sections in the inspector */
   group?: string;
+  /**
+   * Shown as the setting's tooltip (and inline in "Describe settings" mode).
+   * Write it to teach: what it changes on screen, which part of the sound it
+   * relates to, and a tip for exploring. One or two sentences.
+   */
   hint?: string;
 }
 
@@ -214,7 +219,12 @@ export type ParamSpec =
       /** slider response */
       curve?: 'linear' | 'log';
     })
-  | (ParamBase & { type: 'select'; options: { value: string; label: string }[]; default: string })
+  | (ParamBase & {
+      type: 'select';
+      /** `hint` explains what choosing this option does (shown in the dropdown / tooltip) */
+      options: { value: string; label: string; hint?: string }[];
+      default: string;
+    })
   | (ParamBase & { type: 'boolean'; default: boolean })
   | (ParamBase & { type: 'color'; default: string })
   | (ParamBase & { type: 'gradient'; default: GradientStop[] });
@@ -300,20 +310,20 @@ export type BlendMode =
   | 'color'
   | 'luminosity';
 
-export const BLEND_MODES: { value: BlendMode; label: string }[] = [
-  { value: 'source-over', label: 'Normal' },
-  { value: 'lighter', label: 'Add' },
-  { value: 'screen', label: 'Screen' },
-  { value: 'multiply', label: 'Multiply' },
-  { value: 'overlay', label: 'Overlay' },
-  { value: 'soft-light', label: 'Soft light' },
-  { value: 'hard-light', label: 'Hard light' },
-  { value: 'color-dodge', label: 'Color dodge' },
-  { value: 'difference', label: 'Difference' },
-  { value: 'exclusion', label: 'Exclusion' },
-  { value: 'hue', label: 'Hue' },
-  { value: 'color', label: 'Color' },
-  { value: 'luminosity', label: 'Luminosity' },
+export const BLEND_MODES: { value: BlendMode; label: string; hint: string }[] = [
+  { value: 'source-over', label: 'Normal', hint: 'Paints this layer over the ones below; only its transparent parts let them show.' },
+  { value: 'lighter', label: 'Add', hint: 'Adds the colours: overlaps get brighter and can burn to white. Black adds nothing. Good for light.' },
+  { value: 'screen', label: 'Screen', hint: 'Lightens: like projecting two slides onto one screen. Black disappears; overlaps brighten gently.' },
+  { value: 'multiply', label: 'Multiply', hint: 'Darkens: like stacking coloured gels. White disappears. Over a black stage it shows nothing.' },
+  { value: 'overlay', label: 'Overlay', hint: 'Adds contrast to the layers below, tinted by this one: their lights get lighter, darks darker.' },
+  { value: 'soft-light', label: 'Soft light', hint: 'A gentle Overlay: tints the layers below and slightly lightens or darkens them, like a soft lamp.' },
+  { value: 'hard-light', label: 'Hard light', hint: 'A strong Overlay led by this layer: its light parts screen, its dark parts multiply.' },
+  { value: 'color-dodge', label: 'Color dodge', hint: 'Brightens the layers below by this colour, blowing highlights out to vivid colour. Black does nothing.' },
+  { value: 'difference', label: 'Difference', hint: 'Subtracts colours: matching colours turn black, white inverts. Gives psychedelic, inverted overlaps.' },
+  { value: 'exclusion', label: 'Exclusion', hint: 'A softer Difference: white inverts, black does nothing, mid tones wash toward grey.' },
+  { value: 'hue', label: 'Hue', hint: 'Takes this layer’s hue but keeps the brightness and saturation below: recolours without reshading.' },
+  { value: 'color', label: 'Color', hint: 'Takes this layer’s hue and saturation over the brightness below, like tinting a black-and-white photo.' },
+  { value: 'luminosity', label: 'Luminosity', hint: 'Takes this layer’s brightness with the colours below it: the opposite of Color.' },
 ];
 
 export interface LayerTransform {

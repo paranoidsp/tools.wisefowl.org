@@ -495,3 +495,37 @@
 .modpanel__controls .slider__thumb {
   border-color: var(--mod);
 }
+
+.panel-head--tabs {
+  gap: 6px;
+}
+.panel-head--tabs > .segmented {
+  flex: 1;
+}
+.insp-describe.is-on {
+  color: var(--accent, #7c9cff);
+  background: var(--accent-tint, rgba(124, 156, 255, 0.14));
+}
+
+.insp-more {
+  margin: -2px 0 10px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.insp-more summary {
+  cursor: pointer;
+  color: var(--accent, #7c9cff);
+  list-style: none;
+  user-select: none;
+}
+.insp-more summary::before {
+  content: '▸ ';
+}
+.insp-more[open] summary::before {
+  content: '▾ ';
+}
+.insp-more p {
+  margin: 6px 0 6px;
+  line-height: 1.5;
+  color: #b9bdc6;
+}

@@ -2,14 +2,33 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Dropdown, type DropdownOption } from '../Popover';
 import { IconChevron } from '../icons';
+import { useUi } from '../uiStore';
 
-export function Row({ label, hint, children, className = '' }: { label: string; hint?: string; children: ReactNode; className?: string }) {
+/**
+ * Attributes that give a setting's label its explanatory tooltip.
+ * Every control label goes through this so the whole inspector teaches the
+ * same way: hover a label to learn what it does.
+ */
+export function tipAttrs(label: string, hint?: string, meta?: string) {
+  if (!hint) return { 'data-tip': label.length > 14 ? label : undefined };
+  return { 'data-tip': hint, 'data-tip-title': label, 'data-tip-meta': meta, 'data-tip-pos': 'left' as const };
+}
+
+/** The hint printed under a control when "Describe settings" is on. */
+export function Description({ hint }: { hint?: string }) {
+  const on = useUi((s) => s.showDescriptions);
+  if (!on || !hint) return null;
+  return <p className="ctl__desc">{hint}</p>;
+}
+
+export function Row({ label, hint, meta, children, className = '' }: { label: string; hint?: string; meta?: string; children: ReactNode; className?: string }) {
   return (
     <div className={`ctl ${className}`}>
-      <div className="ctl__label" title={hint}>
+      <div className="ctl__label" {...tipAttrs(label, hint, meta)}>
         {label}
       </div>
       <div className="ctl__body">{children}</div>
+      <Description hint={hint} />
     </div>
   );
 }
@@ -77,6 +96,8 @@ export function Segmented<T extends string>({
           className={`segmented__opt ${o.value === value ? 'is-on' : ''}`}
           onClick={() => onChange(o.value)}
           data-tip={o.tip}
+          // longer explanations get the rich tooltip, titled with the option name
+          data-tip-title={o.tip && o.tip.length > 48 && typeof o.label === 'string' ? o.label : undefined}
         >
           {o.label}
         </button>

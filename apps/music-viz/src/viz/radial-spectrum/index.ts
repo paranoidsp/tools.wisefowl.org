@@ -2,7 +2,7 @@
  * Radial Spectrum — perceptual bands wrapped around a circle.
  */
 import type { RGB, VizDefinition } from '../../core/types';
-import { TAU, clamp, follow, lift, num, paletteParams, pickColor, rgba, smoothClosedPath, smoothK, str } from '../_lib2d/util';
+import { TAU, clamp, follow, lift, num, pickColor, rgba, smoothClosedPath, smoothK, str } from '../_lib2d/util';
 
 const MAXM = 768;
 
@@ -17,42 +17,59 @@ const viz: VizDefinition = {
   params: [
     {
       key: 'style', label: 'Style', type: 'select', default: 'bars', group: 'Shape',
+      hint: 'How each point of the spectrum is drawn around the ring. Angle is frequency, length is energy.',
       options: [
-        { value: 'bars', label: 'Bars' },
-        { value: 'blob', label: 'Smooth blob' },
-        { value: 'dots', label: 'Dots' },
-        { value: 'rays', label: 'Light rays' },
+        { value: 'bars', label: 'Bars', hint: 'Solid radial bars with a soft glow: a spectrum analyser bent into a circle.' },
+        { value: 'blob', label: 'Smooth blob', hint: 'One smooth membrane pushed out (or in) by the spectrum, like a breathing cell.' },
+        { value: 'dots', label: 'Dots', hint: 'A dot at the tip of each element, like a necklace, with no bar behind it.' },
+        { value: 'rays', label: 'Light rays', hint: 'Thin rays that fade in from the centre and brighten at the tip.' },
       ],
     },
     {
       key: 'symmetry', label: 'Symmetry', type: 'select', default: 'mirror', group: 'Shape',
+      hint: 'How many times the low-to-high spectrum is repeated around the circle. Repeats turn the same sound into a mandala.',
       options: [
-        { value: 'none', label: 'None (one lap)' },
-        { value: 'mirror', label: 'Mirror (left/right)' },
-        { value: '3', label: '3-fold kaleidoscope' },
-        { value: '4', label: '4-fold kaleidoscope' },
-        { value: '6', label: '6-fold kaleidoscope' },
-        { value: '8', label: '8-fold kaleidoscope' },
+        { value: 'none', label: 'None (one lap)', hint: 'Low to high once around the circle, so there is a jump where the highest meets the lowest.' },
+        { value: 'mirror', label: 'Mirror (left/right)', hint: 'Low to high down one side and back on the other, so the shape is symmetric and seamless.' },
+        { value: '3', label: '3-fold kaleidoscope', hint: 'Three mirrored copies of the spectrum around the ring.' },
+        { value: '4', label: '4-fold kaleidoscope', hint: 'Four mirrored copies of the spectrum around the ring.' },
+        { value: '6', label: '6-fold kaleidoscope', hint: 'Six mirrored copies, like a snowflake.' },
+        { value: '8', label: '8-fold kaleidoscope', hint: 'Eight mirrored copies; each copy has fewer elements, so it looks coarser.' },
       ],
     },
     {
       key: 'direction', label: 'Grow', type: 'select', default: 'out', group: 'Shape',
-      options: [ { value: 'out', label: 'Outward' }, { value: 'in', label: 'Inward' }, { value: 'both', label: 'Both ways' } ],
+      hint: 'Which way loud bands extend from the inner circle.',
+      options: [
+        { value: 'out', label: 'Outward', hint: 'Bands grow away from the centre, like a sunburst.' },
+        { value: 'in', label: 'Inward', hint: 'Bands grow toward the centre, like an iris closing.' },
+        { value: 'both', label: 'Both ways', hint: 'Bands grow out at full length and in at 60%, so the ring thickens symmetrically.' },
+      ],
     },
-    { key: 'inner', label: 'Inner radius', type: 'number', min: 0, max: 0.9, step: 0.01, default: 0.32, group: 'Shape' },
-    { key: 'length', label: 'Length', type: 'number', min: 0.05, max: 1, step: 0.01, default: 0.6, group: 'Shape' },
-    { key: 'barWidth', label: 'Bar width', type: 'number', min: 0.05, max: 1, step: 0.01, default: 0.6, group: 'Shape' },
-    { key: 'resolution', label: 'Resolution', type: 'number', min: 0.25, max: 4, step: 0.05, default: 1, group: 'Shape', hint: 'Elements per band (interpolated)' },
+    { key: 'inner', label: 'Inner radius', type: 'number', min: 0, max: 0.9, step: 0.01, default: 0.32, group: 'Shape', hint: 'Radius of the base circle the spectrum grows from, as a fraction of half the canvas’s shorter side. Try binding it to Bass for a breathing ring.' },
+    { key: 'length', label: 'Length', type: 'number', min: 0.05, max: 1, step: 0.01, default: 0.6, group: 'Shape', hint: 'How far a band at full energy reaches from the base circle, as a fraction of half the canvas’s shorter side.' },
+    { key: 'barWidth', label: 'Bar width', type: 'number', min: 0.05, max: 1, step: 0.01, default: 0.6, group: 'Shape', hint: 'How wide each bar, ray or dot is, as a fraction of the space around the circle it has. 1 makes neighbours touch. Not used in Smooth blob style.' },
+    { key: 'resolution', label: 'Resolution', type: 'number', min: 0.25, max: 4, step: 0.05, default: 1, group: 'Shape', hint: 'Elements drawn per frequency band. Above 1, extra in-between elements are interpolated for a finer, smoother ring; below 1 gives fewer, chunkier bars.' },
 
-    { key: 'pulse', label: 'Beat pulse', type: 'number', min: 0, max: 1, step: 0.01, default: 0.35, group: 'Motion', hint: 'Inner radius jumps on each beat' },
-    { key: 'spin', label: 'Spin', type: 'number', min: -90, max: 90, step: 0.5, default: 6, unit: '°/s', group: 'Motion' },
-    { key: 'decay', label: 'Fall-off', type: 'number', min: 0, max: 0.98, step: 0.01, default: 0.7, group: 'Motion', hint: 'How slowly bars fall' },
-    { key: 'gain', label: 'Gain', type: 'number', min: 0.3, max: 4, step: 0.05, default: 1.3, group: 'Motion' },
-    { key: 'contrast', label: 'Contrast', type: 'number', min: 0.5, max: 3, step: 0.05, default: 1.2, group: 'Motion' },
+    { key: 'pulse', label: 'Beat pulse', type: 'number', min: 0, max: 1, step: 0.01, default: 0.35, group: 'Motion', hint: 'How much the inner circle, and everything on it, jumps outward on each beat (up to 18%). 0 ignores rhythm.' },
+    { key: 'spin', label: 'Spin', type: 'number', min: -90, max: 90, step: 0.5, default: 6, unit: '°/s', group: 'Motion', hint: 'Rotates the ring continuously, in degrees per second (negative turns anticlockwise). At rest the lowest frequency points straight up.' },
+    { key: 'decay', label: 'Fall-off', type: 'number', min: 0, max: 0.98, step: 0.01, default: 0.7, group: 'Motion', hint: 'How slowly bars sink after a sound stops (they always rise quickly). High values give smooth, lingering shapes; low values flicker with every transient.' },
+    { key: 'gain', label: 'Gain', type: 'number', min: 0.3, max: 4, step: 0.05, default: 1.3, group: 'Motion', hint: 'Boosts band energy before drawing. Raise it for quiet tracks; too high and every band hits full length.' },
+    { key: 'contrast', label: 'Contrast', type: 'number', min: 0.5, max: 3, step: 0.05, default: 1.2, group: 'Motion', hint: 'Raises each band’s energy to this power. Higher values flatten quiet bands so only the strongest frequencies stick out; below 1 everything looks fuller.' },
 
-    ...paletteParams('Colour', 'mapping'),
-    { key: 'glow', label: 'Glow', type: 'number', min: 0, max: 1, step: 0.01, default: 0.5, group: 'Colour' },
-    { key: 'core', label: 'Core disc', type: 'number', min: 0, max: 1, step: 0.01, default: 0.25, group: 'Colour', hint: 'Soft fill inside the ring, tinted by the dominant band' },
+    {
+      key: 'palette', label: 'Palette', type: 'select', default: 'mapping', group: 'Colour',
+      hint: 'Where colours come from. Mapping colours each element by its frequency through the global colour mapping.',
+      options: [
+        { value: 'mapping', label: 'Mapping (by frequency)', hint: 'Each element takes its band’s frequency through the global mapping, so colour encodes pitch.' },
+        { value: 'position', label: 'Palette sweep (by position)', hint: 'Colour steps through the palette from low to high bands, independent of the colour mapping.' },
+        { value: 'level', label: 'Palette by level', hint: 'Colour comes from how loud each band is, so the palette shows energy, not pitch.' },
+        { value: 'mono', label: 'Mono (single colour)', hint: 'Everything uses the Mono colour, dimmer for quiet bands.' },
+      ],
+    },
+    { key: 'monoColor', label: 'Mono colour', type: 'color', default: '#9fd8ff', group: 'Colour', hint: 'The colour used for everything. Only used when Palette = Mono.' },
+    { key: 'glow', label: 'Glow', type: 'number', min: 0, max: 1, step: 0.01, default: 0.5, group: 'Colour', hint: 'Strength of the soft halo around bars, dots and the blob outline. Light rays already fade softly and ignore it.' },
+    { key: 'core', label: 'Core disc', type: 'number', min: 0, max: 1, step: 0.01, default: 0.25, group: 'Colour', hint: 'A soft glowing fill inside the inner circle, in the colour of the loudest band, brightening on each beat. Needs a non-zero inner radius.' },
   ],
   presets: [
     { name: 'Sunburst', description: 'Mirrored bars around a breathing core.', params: {} },
