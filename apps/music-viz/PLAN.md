@@ -1,6 +1,6 @@
 ---
 created: 2026-11-06 18:04:41
-updated: 2026-11-07 18:30:00
+updated: 2026-11-07 19:10:00
 creators: [human, claude-opus-5-5]
 type: plan
 status: active
@@ -194,6 +194,40 @@ screenshots), add a smoke test to the site's suite, build, and deploy.
   - Tests: regression specs for bad files and for label explanations; the
     suite is 54/54.
 
+- **2026-11-07 19:10** — v1.2: Random, History and autosave.
+  - **🎲 Random** (top bar, `G`, or Gallery → Surprise me):
+    - Builds 1–3 layers from presets and varies their settings around them
+      (`core/random.ts`), sometimes binding a knob to the music.
+    - Mild, Medium or Wild sets how far it strays.
+    - Seeded: the seed is in the name, so a roll can be rebuilt.
+    - `⇧G` (or the dice in the Layer inspector) shuffles one layer.
+    - A dud guard rerolls quietly (up to 3×) if the stage is still blank
+      1.5 s after a roll while music plays, and drops the dud. In a test of
+      15 rolls on the beatless drone, none ended up blank; without the guard
+      about 5 in 30 were nearly blank.
+  - **History** (left panel tab, `Y`), in `core/history.ts`:
+    - The current visualization autosaves every 3 s (doc plus a 192×120
+      webp thumbnail) to localStorage.
+    - It freezes into a checkpoint when it's replaced (random, scene,
+      import, new, restore), on ⌘S (which also opens rename), and every
+      4 min of editing (a toast offers "Name it").
+    - Rename, star (kept forever), restore (double-click) or delete.
+      Unnamed, unstarred checkpoints beyond 60 are pruned, and on quota
+      errors old thumbnails are dropped.
+    - The store now has `docEpoch` / `docOrigin` to tell a replacement from
+      an edit.
+  - **Bugs found and fixed along the way:**
+    - An edit made less than 3 s before a replacement would have been
+      missing from the frozen checkpoint; it now freezes from the
+      subscription's `prev` state.
+    - The project autosave (400 ms debounce) never flushed on unload, so an
+      edit right before closing the tab was lost; `pagehide` /
+      `beforeunload` now flush it.
+    - Renaming a checkpoint echoed into the project as an "edit" and left
+      duplicates.
+  - **Shortcuts:** ⌘S is now Save checkpoint; export moved to ⇧⌘S.
+  - Tests: History/random regression spec; the suite is 55/55.
+
 ## Backlog (post-v1 ideas)
 - Tie the chroma/pitch reference to `color.a4` (needs `a4` in
   `AnalysisSettings`); make the band tilt (+3 dB/oct) a setting.
@@ -201,4 +235,5 @@ screenshots), add a smoke test to the site's suite, build, and deploy.
 - MIDI input, and MIDI-learn for any knob.
 - Keyframes or an automation timeline per param.
 - Code-split three.js: the bundle is 1.1 MB, 312 KB gzipped.
+- History: compare two checkpoints side by side; export/import the whole history.
 - Shareable project links (encode the project into the URL hash).

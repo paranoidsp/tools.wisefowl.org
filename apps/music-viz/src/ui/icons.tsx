@@ -292,3 +292,27 @@ export const IconInfo = (p: P) => (
     <path d="M8 7.2v3.8M8 5.1v.1" />
   </Svg>
 );
+export const IconDice = (p: P) => (
+  <Svg {...p}>
+    <rect x="2.5" y="2.5" width="11" height="11" rx="2.5" />
+    <path d="M5.6 5.6h.01M10.4 5.6h.01M8 8h.01M5.6 10.4h.01M10.4 10.4h.01" strokeWidth="2.2" />
+  </Svg>
+);
+export const IconHistory = (p: P) => (
+  <Svg {...p}>
+    <path d="M2.8 8a5.2 5.2 0 1 0 1.5-3.7" />
+    <path d="M2.5 2.8v2.6h2.6" />
+    <path d="M8 5.3V8l1.9 1.3" />
+  </Svg>
+);
+export const IconStar = ({ filled, ...p }: P & { filled?: boolean }) => (
+  <Svg {...p}>
+    <path d="m8 2.3 1.7 3.5 3.8.5-2.8 2.7.7 3.8L8 11l-3.4 1.8.7-3.8-2.8-2.7 3.8-.5z" fill={filled ? 'currentColor' : 'none'} />
+  </Svg>
+);
+export const IconSave = (p: P) => (
+  <Svg {...p}>
+    <path d="M3 3.5A1.5 1.5 0 0 1 4.5 2h6L13 4.5v8A1.5 1.5 0 0 1 11.5 14h-7A1.5 1.5 0 0 1 3 12.5z" />
+    <path d="M5.5 2v3h4V2M5.5 14v-4h5v4" />
+  </Svg>
+);

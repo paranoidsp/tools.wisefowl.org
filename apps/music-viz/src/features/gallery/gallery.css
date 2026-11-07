@@ -408,3 +408,4 @@
   .gal-search { flex-basis: auto; }
   .gal-vrow { grid-template-columns: 1fr; }
 }
+.gal-random { margin-top: 10px; }

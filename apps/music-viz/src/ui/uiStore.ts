@@ -6,6 +6,8 @@ export interface Toast {
   id: number;
   kind: ToastKind;
   message: string;
+  /** optional button, e.g. "Rename" */
+  action?: { label: string; run(): void };
 }
 
 interface UiState {
@@ -14,6 +16,9 @@ interface UiState {
   recordStartedAt: number;
   pickerOpen: boolean;
   drawer: 'left' | 'right' | null;
+  /** left panel view */
+  leftView: 'layers' | 'history';
+  setLeftView(v: 'layers' | 'history'): void;
   renamingId: string | null;
   /** print each setting's explanation under it (learning mode) */
   showDescriptions: boolean;
@@ -29,6 +34,8 @@ export const useUi = create<UiState>()((set) => ({
   recordStartedAt: 0,
   pickerOpen: false,
   drawer: null,
+  leftView: 'layers',
+  setLeftView: (leftView) => set({ leftView }),
   renamingId: null,
   showDescriptions: localStorage.getItem('mvs:showDescriptions') === '1',
   setShowDescriptions: (showDescriptions) => {
@@ -41,9 +48,9 @@ export const useUi = create<UiState>()((set) => ({
 }));
 
 let toastId = 0;
-export function toast(message: string, kind: ToastKind = 'info', ms = kind === 'error' ? 5200 : 2800) {
+export function toast(message: string, kind: ToastKind = 'info', ms = kind === 'error' ? 5200 : 2800, action?: Toast['action']) {
   const id = ++toastId;
-  useUi.setState((s) => ({ toasts: [...s.toasts.slice(-3), { id, kind, message }] }));
+  useUi.setState((s) => ({ toasts: [...s.toasts.slice(-3), { id, kind, message, action }] }));
   setTimeout(() => dismissToast(id), ms);
 }
 

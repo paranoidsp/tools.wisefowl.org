@@ -609,3 +609,18 @@
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+.toast__action {
+  flex: none;
+  padding: 3px 9px;
+  border-radius: 5px;
+  border: 1px solid rgba(124, 156, 255, 0.35);
+  background: var(--accent-tint, rgba(124, 156, 255, 0.14));
+  color: var(--accent, #7c9cff);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.toast__action:hover {
+  background: rgba(124, 156, 255, 0.24);
+}

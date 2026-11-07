@@ -4,6 +4,9 @@ import { stage } from '../core/stage';
 import { useStore } from '../core/store';
 import type { ProjectFile } from '../core/types';
 import { toast, useUi } from './uiStore';
+import { discardCurrentOnReplace, useHistory } from '../core/history';
+import { newSeed, randomScene, shuffleLayer } from '../core/random';
+import { getViz } from '../core/registry';
 
 function slug(name: string) {
   return (name || 'music-viz').trim().replace(/[^\w\- ]+/g, '').replace(/\s+/g, '-').toLowerCase() || 'music-viz';
@@ -200,4 +203,83 @@ export function togglePlay() {
     return openAudioDialog();
   }
   engine.toggle().catch((e) => toast(String(e), 'error'));
+}
+
+// ──────────────────────────────────────────────────── random + history ──
+
+/** Wildness for random rolls: 'mild' stays near presets, 'wild' strays far. */
+export const WILDNESS = { mild: 0.12, medium: 0.22, wild: 0.5 } as const;
+export type Wildness = keyof typeof WILDNESS;
+let lastWildness: Wildness = (localStorage.getItem('mvs:wildness') as Wildness) || 'medium';
+export const getWildness = () => lastWildness;
+export function setWildness(w: Wildness) {
+  lastWildness = w;
+  localStorage.setItem('mvs:wildness', w);
+}
+
+/**
+ * Replace the stage with a random visualization. The previous one is kept
+ * in History, so rolling again is never destructive.
+ */
+export function rollRandom(w: Wildness = lastWildness, attempt = 0) {
+  const scene = randomScene(newSeed(), WILDNESS[w]);
+  const st = useStore.getState();
+  st.loadScene(scene, 'random');
+  st.setTab('studio');
+  const epoch = useStore.getState().docEpoch;
+  // Dud guard: some combinations draw (almost) nothing for the music that's
+  // playing (e.g. beat-driven layers on a beatless track). If the stage is
+  // still empty a moment later, quietly roll again and don't keep the dud.
+  if (attempt < 3)
+    setTimeout(() => {
+      if (useStore.getState().docEpoch !== epoch || !engine.state.playing || !stageLooksEmpty()) return;
+      discardCurrentOnReplace();
+      rollRandom(w, attempt + 1);
+    }, 1500);
+  toast(`${scene.name}`, 'info', 3200, {
+    label: 'Keep',
+    run: () => {
+      const id = useHistory.getState().entries.find((e) => e.current)?.id;
+      if (id) {
+        useHistory.getState().toggleStar(id);
+        toast('Starred: it stays in History until you remove it', 'success');
+      }
+    },
+  });
+}
+
+/** True if the stage is nearly uniform and dark (nothing visible drawn). */
+function stageLooksEmpty(): boolean {
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 40;
+  const g = c.getContext('2d', { willReadFrequently: true })!;
+  g.drawImage(stage.canvas, 0, 0, 64, 40);
+  const d = g.getImageData(0, 0, 64, 40).data;
+  let lit = 0;
+  for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 90) lit++;
+  return lit < 12; // fewer than ~0.5% of samples visibly lit
+}
+
+/** Vary the selected layer's settings around their current values. */
+export function shuffleSelectedLayer() {
+  const st = useStore.getState();
+  const layer = st.layers.find((l) => l.id === st.selectedId);
+  const def = layer && getViz(layer.vizId);
+  if (!layer || !def) return toast('Select a layer to shuffle its settings', 'info');
+  st.updateLayer(layer.id, shuffleLayer(layer, def, newSeed(), WILDNESS[lastWildness]));
+}
+
+/** Freeze the current visualization as a named checkpoint (⌘S). */
+export function saveCheckpoint() {
+  const id = useHistory.getState().checkpoint();
+  if (!id) return;
+  useUi.getState().setLeftView('history');
+  useUi.getState().setDrawer(window.innerWidth < 800 ? 'left' : null);
+  useHistory.getState().setRenaming(id);
+}
+
+export function renameCheckpointLater(id: string) {
+  useUi.getState().setLeftView('history');
+  useHistory.getState().setRenaming(id);
 }

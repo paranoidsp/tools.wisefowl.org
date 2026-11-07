@@ -8,6 +8,7 @@ import { IconCopy, IconCube, IconEdit, IconEye, IconEyeOff, IconMore, IconPlus, 
 import { Menu, type Anchor, type MenuItem } from './Popover';
 import { MOD_KEY } from './Tooltip';
 import { useUi } from './uiStore';
+import { LeftTabs } from './HistoryPanel';
 
 const ROW = 50; // row height + gap, px
 
@@ -107,8 +108,7 @@ export function LayersPanel() {
   return (
     <div className="layers">
       <div className="panel-head">
-        <span className="panel-title">Layers</span>
-        <span className="panel-count num">{layers.length || ''}</span>
+        <LeftTabs layerCount={layers.length} />
         <span className="grow" />
         <button className="icon-btn" onClick={() => useUi.getState().setPickerOpen(true)} data-tip="Add layer" data-tip-kbd="A" aria-label="Add layer">
           <IconPlus size={15} />

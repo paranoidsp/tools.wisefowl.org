@@ -106,6 +106,21 @@ export function Guide() {
           </div>
         </section>
 
+        <section className="guide__section">
+          <h2>Exploring and keeping what you find</h2>
+          <p>
+            <strong>🎲 Random</strong> (top bar, or <kbd>G</kbd>) builds a visualization from one to three random layers. Each starts from one of its presets, with
+            the settings varied around it, and sometimes a knob bound to the music. The menu next to it sets how far it strays (Mild, Medium, Wild).{' '}
+            <kbd>⇧G</kbd> shuffles just the selected layer. Every roll has a seed in its name, so a good one can be found again.
+          </p>
+          <p>
+            <strong>History</strong> (the tab above the layers, or <kbd>Y</kbd>) keeps everything you’ve made or tried, with thumbnails. What you’re working on is
+            auto-saved in this browser every few seconds. It becomes a checkpoint when you roll a new random, open a scene, press <kbd>⌘S</kbd>, or every few
+            minutes while you edit. Rename a checkpoint (double-click its name), star it to keep it for good, and double-click a row to go back to it. Unnamed
+            checkpoints beyond the newest 60 are pruned.
+          </p>
+        </section>
+
         <section className="guide__section guide__two">
           <div>
             <h2>Tips</h2>

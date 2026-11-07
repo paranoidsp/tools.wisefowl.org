@@ -120,3 +120,56 @@ test('every setting label explains itself on hover', async ({ page }) => {
   await labels.filter({ hasText: 'Opacity' }).first().hover();
   await expect(page.locator('.tooltip--rich')).toContainText('Opacity');
 });
+
+// History + random: every visualization you leave is kept, edits are never
+// lost to a roll, checkpoints can be named, and it all survives a reload.
+const historyOf = (page) =>
+  page.evaluate(() => JSON.parse(localStorage.getItem('music-viz-studio:history:v1') || '[]'));
+
+test('random rolls and checkpoints are kept in History across reloads', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/music-viz/');
+  await expect(page.locator('.transport')).toBeVisible();
+  await page.waitForTimeout(500);
+
+  // an edit (rename) immediately followed by a random roll: the edit must survive
+  const name = page.locator('.project-name');
+  await name.fill('Before the dice');
+  await name.press('Enter');
+  await page.keyboard.press('g');
+  await expect.poll(async () => (await historyOf(page)).length).toBeGreaterThanOrEqual(2);
+  let h = await historyOf(page);
+  expect(h[0].current).toBe(true);
+  expect(h[0].origin).toBe('random');
+  expect(h[0].name).toMatch(/^Random /);
+  expect(h.find((e) => !e.current)?.name).toBe('Before the dice');
+
+  // another roll keeps the previous random too
+  await page.keyboard.press('g');
+  await expect.poll(async () => (await historyOf(page)).filter((e) => e.origin === 'random').length).toBe(2);
+
+  // ⌘S: checkpoint and name it in place
+  await page.keyboard.press('Control+s');
+  const rename = page.locator('.history__rename');
+  await expect(rename).toBeFocused();
+  await rename.fill('A keeper');
+  await rename.press('Enter');
+  // both the checkpoint and the live visualization now carry the name
+  await expect(page.locator('.history__name', { hasText: 'A keeper' })).toHaveCount(2);
+  // the live visualization carries the name forward
+  await expect(name).toHaveValue('A keeper');
+
+  // rolling on without further edits must not leave a duplicate of the named checkpoint
+  await page.keyboard.press('g');
+  await expect.poll(async () => (await historyOf(page))[0].origin).toBe('random');
+  expect((await historyOf(page)).filter((e) => e.name === 'A keeper')).toHaveLength(1);
+  await expect(name).not.toHaveValue('A keeper');
+
+  await page.reload();
+  await expect(page.locator('.transport')).toBeVisible();
+  h = await historyOf(page);
+  expect(h.some((e) => e.name === 'A keeper' && e.named && !e.current)).toBe(true);
+  expect(h.some((e) => e.name === 'Before the dice')).toBe(true);
+  // the restored session is the last random roll
+  expect(h[0].current && h[0].origin === 'random').toBe(true);
+});
