@@ -110,12 +110,27 @@ export async function importProjectFile(file: File) {
   }
 }
 
+/**
+ * Show the browser's file picker. The input is attached to the document while
+ * the dialog is open: a detached input can be garbage-collected mid-dialog,
+ * in which case `change` never fires and picking a file silently does nothing.
+ */
 function pickFile(accept: string): Promise<File | null> {
   return new Promise((res) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = accept;
-    input.onchange = () => res(input.files?.[0] ?? null);
+    input.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;opacity:0';
+    document.body.appendChild(input);
+    let done = false;
+    const finish = (f: File | null) => {
+      if (done) return;
+      done = true;
+      input.remove();
+      res(f);
+    };
+    input.addEventListener('change', () => finish(input.files?.[0] ?? null));
+    input.addEventListener('cancel', () => finish(null));
     input.click();
   });
 }
@@ -127,48 +142,48 @@ export async function openProjectDialog() {
 
 // ─────────────────────────────────────────────────────────────── audio ──
 
-const AUDIO_EXT = /\.(mp3|wav|ogg|oga|flac|m4a|aac|opus|webm|aiff?|caf|mp4)$/i;
-
+/**
+ * Load a file and start it. Every way of choosing a file (Open, drag-and-drop)
+ * ends up here. Nothing plays unless the load succeeded; otherwise the engine's
+ * error (shown in the transport) says why, and we echo it in a toast.
+ */
 export async function loadAudioFile(file: File) {
-  try {
-    await engine.loadFile(file);
-    await engine.play().catch(() => {});
-  } catch (e) {
-    toast(`Could not open ${file.name}: ${e instanceof Error ? e.message : String(e)}`, 'error');
-  }
+  engine.unlock();
+  const ok = await engine.loadFile(file);
+  if (ok) await engine.play().catch((e) => toast(`Couldn’t start playback: ${String(e)}`, 'error'));
+  // on failure the transport's message banner explains why (engine.state.error)
 }
 
 export async function openAudioDialog() {
-  const f = await pickFile('audio/*,video/*,.mp3,.wav,.ogg,.flac,.m4a,.aac,.opus');
+  engine.unlock(); // inside the click, before the dialog takes focus
+  const f = await pickFile('audio/*,video/*,.mp3,.wav,.ogg,.oga,.opus,.flac,.m4a,.aac,.aif,.aiff,.webm,.mp4');
   if (f) await loadAudioFile(f);
 }
 
 export async function loadDemo(id: string) {
-  try {
-    await engine.loadDemo(id);
-    await engine.play().catch(() => {});
-  } catch (e) {
-    toast(`Could not load demo: ${String(e)}`, 'error');
-  }
+  engine.unlock();
+  const ok = await engine.loadDemo(id);
+  if (ok) await engine.play().catch((e) => toast(`Couldn’t start playback: ${String(e)}`, 'error'));
+  // on failure the transport's message banner explains why (engine.state.error)
 }
 
 export async function startMic() {
-  try {
-    await engine.useMicrophone();
-    toast('Listening to your microphone', 'info');
-  } catch (e) {
-    toast(`Microphone unavailable: ${e instanceof Error ? e.message : String(e)}`, 'error');
-  }
+  engine.unlock();
+  await engine.useMicrophone();
+  if (engine.state.kind === 'mic') toast('Listening to your microphone. It isn’t played back or recorded anywhere.', 'info');
+  // on failure the transport's message banner explains why (engine.state.error)
 }
 
 /** Route dropped files: project JSON → import, audio/video → engine. */
 export async function handleFiles(files: FileList | File[]) {
   const arr = [...files];
-  const json = arr.find((f) => f.name.endsWith('.json') || f.type === 'application/json');
+  if (!arr.length) return;
+  const json = arr.find((f) => f.name.toLowerCase().endsWith('.json') || f.type === 'application/json');
   if (json) return importProjectFile(json);
-  const audio = arr.find((f) => f.type.startsWith('audio/') || f.type.startsWith('video/') || AUDIO_EXT.test(f.name));
-  if (audio) return loadAudioFile(audio);
-  if (arr.length) toast('Drop an audio file or a project .json', 'error');
+  // Prefer something that looks like audio; otherwise let the engine explain what's wrong with the file.
+  const audio = arr.find((f) => f.type.startsWith('audio/') || f.type.startsWith('video/')) ?? arr[0];
+  if (arr.length > 1) toast(`Opening “${audio.name}”. One file at a time for now.`, 'info');
+  return loadAudioFile(audio);
 }
 
 export function toggleFullscreen() {
@@ -178,6 +193,7 @@ export function toggleFullscreen() {
 }
 
 export function togglePlay() {
+  engine.unlock();
   if (engine.state.kind === 'none') {
     const demo = engine.demos[0];
     if (demo) return loadDemo(demo.id);

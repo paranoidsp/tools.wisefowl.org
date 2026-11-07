@@ -18,38 +18,49 @@ const viz: VizDefinition = {
   params: [
     {
       key: 'layout', label: 'Space', type: 'select', default: 'scroll', group: 'Space',
+      hint: 'Which two properties of each spectral peak (a frequency standing out above its neighbours) become the x and y position.',
       options: [
-        { value: 'scroll', label: 'x = frequency, y = time (scrolling)' },
-        { value: 'amplitude', label: 'x = frequency, y = amplitude' },
-        { value: 'grid', label: 'x = pitch class, y = octave (note grid)' },
+        { value: 'scroll', label: 'x = frequency, y = time (scrolling)', hint: 'A self-writing piano roll: each frame is a new row, so melodies leave staircases and held notes leave lines.' },
+        { value: 'amplitude', label: 'x = frequency, y = amplitude', hint: 'Louder peaks sit higher, giving a spiky skyline of the strongest frequencies with fading afterimages.' },
+        { value: 'grid', label: 'x = pitch class, y = octave (note grid)', hint: 'Twelve columns of note names by octave rows, so every C lands in one column and chords light up cells.' },
       ],
     },
-    { key: 'minFreq', label: 'Lowest frequency', type: 'number', min: 20, max: 500, step: 1, default: 40, unit: 'Hz', curve: 'log', group: 'Space' },
-    { key: 'maxFreq', label: 'Highest frequency', type: 'number', min: 1000, max: 16000, step: 10, default: 8000, unit: 'Hz', curve: 'log', group: 'Space' },
-    { key: 'direction', label: 'Scroll direction', type: 'select', default: 'up', group: 'Space', options: [ { value: 'up', label: 'Upward (new at bottom)' }, { value: 'down', label: 'Downward (new at top)' } ] },
+    { key: 'minFreq', label: 'Lowest frequency', type: 'number', min: 20, max: 500, step: 1, default: 40, unit: 'Hz', curve: 'log', group: 'Space', hint: 'Left edge of the frequency axis; peaks below it are ignored. In the note grid it is the bottom of the lowest octave row (32.7 Hz is C1).' },
+    { key: 'maxFreq', label: 'Highest frequency', type: 'number', min: 1000, max: 16000, step: 10, default: 8000, unit: 'Hz', curve: 'log', group: 'Space', hint: 'Right edge of the frequency axis; peaks above it are ignored. The axis is logarithmic, so each octave (doubling) gets equal width, as the ear hears it.' },
+    { key: 'direction', label: 'Scroll direction', type: 'select', default: 'up', group: 'Space', hint: 'Which way the history moves. Only used when Space = frequency/time.',
+      options: [
+        { value: 'up', label: 'Upward (new at bottom)', hint: 'New peaks appear along the bottom edge and rise as they age.' },
+        { value: 'down', label: 'Downward (new at top)', hint: 'New peaks appear at the top and fall like rain.' },
+      ] },
 
-    { key: 'peaks', label: 'Peaks', type: 'number', min: 1, max: MAXK, step: 1, default: 18, group: 'Peaks' },
-    { key: 'threshold', label: 'Threshold', type: 'number', min: 0, max: 0.9, step: 0.01, default: 0.12, group: 'Peaks' },
-    { key: 'range', label: 'Dynamic range', type: 'number', min: 0.1, max: 1, step: 0.01, default: 0.4, group: 'Peaks', hint: 'Amplitude span below the loudest peak that maps to size/height' },
-    { key: 'history', label: 'History', type: 'number', min: 10, max: MAXH, step: 1, default: 200, unit: 'frames', group: 'Peaks' },
+    { key: 'peaks', label: 'Peaks', type: 'number', min: 1, max: MAXK, step: 1, default: 18, group: 'Peaks', hint: 'How many of the loudest spectral peaks are plotted each frame. A few shows just the melody and bass; many shows harmonics and noise too.' },
+    { key: 'threshold', label: 'Threshold', type: 'number', min: 0, max: 0.9, step: 0.01, default: 0.12, group: 'Peaks', hint: 'Peaks weaker than this (after the Dynamic range scaling) are skipped. Raise it to clean up clutter from quiet partials and noise.' },
+    { key: 'range', label: 'Dynamic range', type: 'number', min: 0.1, max: 1, step: 0.01, default: 0.4, group: 'Peaks', hint: 'How far below the loudest peak a peak can be and still show up. Small values show only the top few as large marks; large values give quieter peaks a size and brightness too.' },
+    { key: 'history', label: 'History', type: 'number', min: 10, max: MAXH, step: 1, default: 200, unit: 'frames', group: 'Peaks', hint: 'How many past frames stay on screen (60 frames is about one second). In scrolling mode it sets how much time fits on the canvas; in the others, how long afterimages linger.' },
     {
       key: 'shape', label: 'Mark', type: 'select', default: 'dash', group: 'Peaks',
-      options: [ { value: 'dash', label: 'Dashes (piano roll)' }, { value: 'dot', label: 'Dots' }, { value: 'glow', label: 'Glow' } ],
-    },
-    { key: 'size', label: 'Size', type: 'number', min: 1, max: 40, step: 0.5, default: 6, unit: 'px', group: 'Peaks' },
-    { key: 'fade', label: 'Fade with age', type: 'number', min: 0, max: 1, step: 0.01, default: 0.7, group: 'Peaks' },
-
-    { key: 'guides', label: 'Guides', type: 'number', min: 0, max: 1, step: 0.01, default: 0.4, group: 'Guides' },
-    {
-      key: 'palette', label: 'Palette', type: 'select', default: 'mapping', group: 'Colour',
+      hint: 'How each peak is drawn.',
       options: [
-        { value: 'mapping', label: 'Mapping (by frequency)' },
-        { value: 'pitch', label: 'Mapping (by pitch class)' },
-        { value: 'level', label: 'Palette by amplitude' },
-        { value: 'mono', label: 'Mono' },
+        { value: 'dash', label: 'Dashes (piano roll)', hint: 'Short horizontal strokes that join up over time into piano-roll note bars.' },
+        { value: 'dot', label: 'Dots', hint: 'Solid round dots; good for seeing individual frames.' },
+        { value: 'glow', label: 'Glow', hint: 'Soft glowing blobs that add up where peaks overlap.' },
       ],
     },
-    { key: 'monoColor', label: 'Mono colour', type: 'color', default: '#a8e6ff', group: 'Colour' },
+    { key: 'size', label: 'Size', type: 'number', min: 1, max: 40, step: 0.5, default: 6, unit: 'px', group: 'Peaks', hint: 'Base size of each mark; louder peaks are drawn larger. Try binding it to Loudness.' },
+    { key: 'fade', label: 'Fade with age', type: 'number', min: 0, max: 1, step: 0.01, default: 0.7, group: 'Peaks', hint: 'How much older marks fade before they drop out of the history. 0 keeps the whole history at full strength; 1 fades the oldest to nothing.' },
+
+    { key: 'guides', label: 'Guides', type: 'number', min: 0, max: 1, step: 0.01, default: 0.4, group: 'Guides', hint: 'Brightness of the reference lines: a line at every C (labelled C2, C3 …) on the frequency axis, or the cells and note names in the note grid. 0 hides them.' },
+    {
+      key: 'palette', label: 'Palette', type: 'select', default: 'mapping', group: 'Colour',
+      hint: 'Where each mark’s colour comes from.',
+      options: [
+        { value: 'mapping', label: 'Mapping (by frequency)', hint: 'The peak’s exact frequency goes through the global colour mapping.' },
+        { value: 'pitch', label: 'Mapping (by pitch class)', hint: 'Colour by note name only, so every C has the same colour in any octave.' },
+        { value: 'level', label: 'Palette by amplitude', hint: 'Colour shows how loud the peak is, along the palette, not its pitch.' },
+        { value: 'mono', label: 'Mono', hint: 'Every mark uses the single Mono colour below.' },
+      ],
+    },
+    { key: 'monoColor', label: 'Mono colour', type: 'color', default: '#a8e6ff', group: 'Colour', hint: 'The colour of every mark. Only used when Palette = Mono.' },
   ],
   presets: [
     { name: 'Piano roll', description: 'Peaks rise from the bottom as dashes; melodies trace staircases.', params: {} },

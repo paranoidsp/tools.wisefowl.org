@@ -1,20 +1,15 @@
 /** Centre stage: hosts the global compositor canvas (mounted once, never disposed). */
 import { useEffect, useRef } from 'react';
-import { engine } from '../audio/engine';
 import { stage } from '../core/stage';
 import { useStore } from '../core/store';
-import { loadDemo, openAudioDialog } from './actions';
-import { IconFolder, IconLayers, IconMusic, IconPanels, IconPlus, IconSparkle } from './icons';
+import { IconLayers, IconPanels, IconPlus, IconSparkle } from './icons';
 import { useUi } from './uiStore';
-import { useEngineState } from './useEngine';
 
 let started = false;
 
 export function Stage() {
   const host = useRef<HTMLDivElement>(null);
   const empty = useStore((s) => s.layers.length === 0);
-  const focus = useStore((s) => s.focusMode);
-  const st = useEngineState();
 
   useEffect(() => {
     stage.mount(host.current!);
@@ -24,8 +19,6 @@ export function Stage() {
     }
     return () => stage.unmount();
   }, []);
-
-  const noAudio = st.kind === 'none' && !st.loading;
 
   return (
     <div className="stage">
@@ -47,17 +40,6 @@ export function Stage() {
               </button>
             </div>
           </div>
-        </div>
-      )}
-      {!empty && noAudio && !focus && (
-        <div className="stage-audio-hint">
-          <span>No audio yet:</span>
-          <button className="chip chip--solid" onClick={() => (engine.demos[0] ? loadDemo(engine.demos[0].id) : openAudioDialog())}>
-            <IconMusic size={12} /> Play a demo
-          </button>
-          <button className="chip chip--solid" onClick={() => openAudioDialog()}>
-            <IconFolder size={12} /> Open file
-          </button>
         </div>
       )}
       <div className="stage__drawer-btns">

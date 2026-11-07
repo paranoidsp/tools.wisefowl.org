@@ -1,6 +1,6 @@
 ---
 created: 2026-11-06 18:04:41
-updated: 2026-11-07 17:55:00
+updated: 2026-11-07 18:30:00
 creators: [human, claude-opus-5-5]
 type: plan
 status: active
@@ -157,6 +157,42 @@ screenshots), add a smoke test to the site's suite, build, and deploy.
   within about 30 s. A browser check on the live site passed: demo plays,
   56 fps, no console errors, gallery renders. Unknown paths such as `/apps/…`
   return Pages' fallback page, not source files.
+
+- **2026-11-07 18:30** — v1.1, from Karthik's first feedback:
+  - **Tooltips on every setting (learning first).**
+    - Hovering any label shows a rich tooltip: what the setting does, which
+      part of the sound drives it, and its range and default.
+    - Describe mode (the ⓘ button or the I key) prints every explanation
+      inline.
+    - Three agents wrote the content from the code: all 297 viz params and
+      their options, 13 blend modes, every Mapping, analysis and Scene
+      setting, and the modulation sources.
+    - They also caught three wrong hints and a backwards label
+      ("Morph speed" is now "Morph smoothing").
+  - **Audio loading fixed.** Root causes:
+    1. A failed decode reset the engine to "nothing loaded", then the UI's
+       `play()` silently started the demo and cleared the error.
+    2. The error line rendered off-screen, below the transport.
+    3. The file `<input>` was detached from the DOM, so it could be
+       garbage-collected mid-dialog and `change` would never fire.
+    4. `ctx.resume()` without a user gesture hangs rather than rejecting.
+  - **Now:**
+    - Files get pre-checks: empty, not audio, MIDI, WMA, DRM, playlists, too
+      large.
+    - Read and decode failures are explained per format (cloud placeholder,
+      ALAC in .m4a, AIFF outside Safari…).
+    - The current track keeps playing until the new one decodes.
+    - Silent files get a notice.
+    - When the browser blocks sound, a notice says so instead of hanging.
+    - Audio unlocks on the first click or keypress.
+    - Messages sit in a dismissable banner above the transport.
+  - **Audio entry points consolidated** to one source control (Open, Demos,
+    Mic) plus drag-and-drop anywhere. The stage pill and the seek-bar links
+    are gone.
+  - Selecting the already-selected layer no longer yanks the inspector back
+    to the Layer tab.
+  - Tests: regression specs for bad files and for label explanations; the
+    suite is 54/54.
 
 ## Backlog (post-v1 ideas)
 - Tie the chroma/pitch reference to `color.a4` (needs `a4` in

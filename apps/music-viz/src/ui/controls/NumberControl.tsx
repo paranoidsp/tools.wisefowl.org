@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLive } from './live';
+import { Description, tipAttrs } from './basic';
 
 export interface NumberControlProps {
   label: string;
@@ -60,6 +61,16 @@ export function makeScale(min: number, max: number, curve?: 'linear' | 'log') {
     return min + (max - min) * (isLog ? Math.pow(u, 2.5) : u);
   };
   return { toT, fromT };
+}
+
+/** "Range 0–1 · default 0.5 · drag label to scrub, double-click to reset" */
+function numberMeta(p: NumberControlProps): string {
+  const dec = decimalsOf(p.step ?? (p.max - p.min) / 100);
+  const f = (v: number) => formatNumber(v, dec, p.unit);
+  const parts = [`Range ${f(p.min)} – ${f(p.max)}`];
+  if (p.defaultValue != null) parts.push(`default ${f(p.defaultValue)}`);
+  if (p.trailing) parts.push('⦿ binds it to the music');
+  return parts.join(' · ');
 }
 
 export function formatNumber(v: number, decimals: number, unit?: string) {
@@ -234,7 +245,7 @@ export function NumberControl(p: NumberControlProps) {
       {!p.noLabel && (
         <div
           className="ctl__label ctl__label--scrub"
-          title={p.hint ? `${p.label} — ${p.hint}` : p.label}
+          {...tipAttrs(p.label, p.hint, numberMeta(p))}
           onPointerDown={onScrubDown(false)}
           onPointerMove={onScrubMove}
           onPointerUp={onScrubUp}
@@ -298,6 +309,7 @@ export function NumberControl(p: NumberControlProps) {
         </div>
       )}
       {p.trailing ?? <span className="ctl__trail-spacer" />}
+      <Description hint={p.hint} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 /** Renders one ParamSpec as the right control. */
 import type { GradientStop, Modulation, ParamSpec, ParamValue } from '../../core/types';
-import { Choice, ColorField, Row, Toggle } from './basic';
+import { Choice, ColorField, Description, Row, tipAttrs, Toggle } from './basic';
 import { GradientEditor } from './GradientEditor';
 import { ModButton } from './ModButton';
 import { NumberControl } from './NumberControl';
@@ -57,10 +57,11 @@ export function ParamControl({ spec, value, onChange, mod, onMod }: Props) {
     case 'gradient':
       return (
         <div className="ctl ctl--stack">
-          <div className="ctl__label" title={spec.hint}>
+          <div className="ctl__label" {...tipAttrs(spec.label, spec.hint)}>
             {spec.label}
           </div>
           <GradientEditor value={Array.isArray(value) ? (value as GradientStop[]) : spec.default} onChange={onChange} />
+          <Description hint={spec.hint} />
         </div>
       );
   }

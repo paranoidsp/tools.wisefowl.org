@@ -1,12 +1,16 @@
 /**
  * One global tooltip, driven by attributes so any element can opt in:
  *   data-tip="Undo"  data-tip-kbd="⌘Z"  data-tip-pos="top|bottom|left|right"
+ * Rich (explanatory) tooltips for settings add a bold title and a muted meta line:
+ *   data-tip-title="Ring spacing"  data-tip-meta="Range 0–1 · default 0.5"
  */
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface TipState {
   text: string;
+  title: string | null;
+  meta: string | null;
   kbd: string | null;
   x: number;
   y: number;
@@ -40,7 +44,7 @@ export function TooltipLayer() {
         x = r.right + 7;
         y = r.top + r.height / 2;
       }
-      setTip({ text, kbd: el.getAttribute('data-tip-kbd'), x, y, pos });
+      setTip({ text, title: el.getAttribute('data-tip-title'), meta: el.getAttribute('data-tip-meta'), kbd: el.getAttribute('data-tip-kbd'), x, y, pos });
     };
     const over = (e: PointerEvent) => {
       if (e.pointerType === 'touch') return;
@@ -50,7 +54,9 @@ export function TooltipLayer() {
       current.current = el;
       setTip(null);
       if (!el) return;
-      const delay = performance.now() - warm.current < 600 ? 60 : 480;
+      // explanatory tooltips come up a little sooner: they're how people learn the tool
+      const cold = el.hasAttribute('data-tip-title') ? 350 : 480;
+      const delay = performance.now() - warm.current < 600 ? 60 : cold;
       timer.current = setTimeout(() => el.isConnected && current.current === el && show(el), delay);
     };
     const down = () => hide();
@@ -67,6 +73,15 @@ export function TooltipLayer() {
   }, []);
 
   if (!tip) return null;
+  if (tip.title)
+    return createPortal(
+      <div className={`tooltip tooltip--rich tooltip--${tip.pos}`} style={{ left: tip.x, top: tip.y }} role="tooltip">
+        <div className="tooltip__title">{tip.title}</div>
+        <div className="tooltip__body">{tip.text}</div>
+        {tip.meta && <div className="tooltip__meta">{tip.meta}</div>}
+      </div>,
+      document.body,
+    );
   return createPortal(
     <div className={`tooltip tooltip--${tip.pos}`} style={{ left: tip.x, top: tip.y }} role="tooltip">
       <span>{tip.text}</span>

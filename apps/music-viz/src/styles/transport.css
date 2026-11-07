@@ -300,3 +300,67 @@
     display: none;
   }
 }
+
+/* ─── audio source messages (errors / notices), shown above the transport ─── */
+.transport {
+  position: relative;
+}
+.source-msg {
+  position: absolute;
+  left: 12px;
+  bottom: calc(100% + 10px);
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  max-width: min(620px, calc(100% - 24px));
+  padding: 10px 10px 10px 12px;
+  border-radius: 10px;
+  background: #1d1416;
+  border: 1px solid rgba(255, 107, 107, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  animation: msg-in 160ms ease-out;
+}
+.source-msg--notice {
+  background: #1d1a12;
+  border-color: rgba(255, 180, 84, 0.35);
+}
+.source-msg__icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--danger, #ff6b6b);
+}
+.source-msg--notice .source-msg__icon {
+  color: var(--mod, #ffb454);
+}
+.source-msg__text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text, #e8e9ed);
+}
+.source-msg__close {
+  flex: none;
+}
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.seek-loading {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgba(17, 19, 24, 0.88);
+  font-size: 12px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.seek-empty--prompt span {
+  padding: 0 12px;
+  text-align: center;
+}

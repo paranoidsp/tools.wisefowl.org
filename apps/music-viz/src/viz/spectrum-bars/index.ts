@@ -12,17 +12,23 @@ const viz: VizDefinition = {
   space: '2d',
   tags: ['classic', 'spectrum'],
   params: [
-    { key: 'gap', label: 'Gap', type: 'number', min: 0, max: 0.9, step: 0.01, default: 0.25, group: 'Shape' },
-    { key: 'height', label: 'Height', type: 'number', min: 0.1, max: 1, step: 0.01, default: 0.7, group: 'Shape' },
-    { key: 'radius', label: 'Corner radius', type: 'number', min: 0, max: 20, step: 0.5, default: 3, unit: 'px', group: 'Shape' },
-    { key: 'mirror', label: 'Mirror vertically', type: 'boolean', default: false, group: 'Shape' },
+    { key: 'gap', label: 'Gap', type: 'number', min: 0, max: 0.9, step: 0.01, default: 0.25, group: 'Shape', hint: 'Fraction of each band’s slot left empty between bars. 0 makes a solid skyline; high values give thin needles, which help you pick out single bands.' },
+    { key: 'height', label: 'Height', type: 'number', min: 0.1, max: 1, step: 0.01, default: 0.7, group: 'Shape', hint: 'How tall a bar at full energy reaches, as a fraction of the canvas height. Each bar’s height is its band’s loudness on the dB scale set in Analysis.' },
+    { key: 'radius', label: 'Corner radius', type: 'number', min: 0, max: 20, step: 0.5, default: 3, unit: 'px', group: 'Shape', hint: 'Rounds the corners of each bar. Purely cosmetic; large values turn narrow bars into pills.' },
+    { key: 'mirror', label: 'Mirror vertically', type: 'boolean', default: false, group: 'Shape', hint: 'Grows each bar both up and down from its base line, at half height each way, so the spectrum reads as a symmetric waveform-like shape. Looks best with Anchor = Centre.' },
     {
-      key: 'anchor', label: 'Anchor', type: 'select', default: 'bottom', group: 'Shape',
-      options: [ { value: 'bottom', label: 'Bottom' }, { value: 'center', label: 'Centre' } ],
+      key: 'anchor', label: 'Anchor', type: 'select', default: 'bottom', group: 'Shape', hint: 'Where the bars’ base line sits: along the bottom edge or across the middle of the canvas.',
+      options: [
+        { value: 'bottom', label: 'Bottom', hint: 'Bars stand on the bottom edge, like a classic equaliser display.' },
+        { value: 'center', label: 'Centre', hint: 'Bars are centred on the middle line and grow outward from it.' },
+      ],
     },
-    { key: 'colorBy', label: 'Colour by', type: 'select', default: 'freq', group: 'Colour',
-      options: [ { value: 'freq', label: 'Frequency' }, { value: 'level', label: 'Level' } ] },
-    { key: 'alpha', label: 'Opacity', type: 'number', min: 0.1, max: 1, step: 0.01, default: 0.95, group: 'Colour' },
+    { key: 'colorBy', label: 'Colour by', type: 'select', default: 'freq', group: 'Colour', hint: 'What decides each bar’s colour: where the band sits in pitch, or how loud it is right now.',
+      options: [
+        { value: 'freq', label: 'Frequency', hint: 'Each bar takes its band’s centre frequency through the global colour mapping, so colour encodes pitch.' },
+        { value: 'level', label: 'Level', hint: 'Colour comes from the band’s energy along the palette, so loud bars and quiet bars differ in colour.' },
+      ] },
+    { key: 'alpha', label: 'Opacity', type: 'number', min: 0.1, max: 1, step: 0.01, default: 0.95, group: 'Colour', hint: 'How opaque the bars are. Lower values let layers underneath show through, and trails (layer feedback) build up more softly.' },
   ],
   presets: [
     { name: 'Classic', params: {} },

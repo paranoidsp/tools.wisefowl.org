@@ -6,7 +6,7 @@ import type { TrackOverview } from '../core/engine-api';
 import { useStore } from '../core/store';
 import type { ColorMapper } from '../core/types';
 import { loadDemo, openAudioDialog, startMic, togglePlay } from './actions';
-import { IconChevron, IconFolder, IconLoop, IconMic, IconMusic, IconMute, IconPause, IconPlay, IconVolume } from './icons';
+import { IconChevron, IconClose, IconFolder, IconLoop, IconMic, IconMusic, IconMute, IconPause, IconPlay, IconVolume, IconWarn } from './icons';
 import { getLatestFeatures } from './liveFeatures';
 import { Popover } from './Popover';
 import { fmtTime, refreshEngineState, useEngineState } from './useEngine';
@@ -50,6 +50,7 @@ export function Transport() {
 
   return (
     <footer className="transport">
+      <SourceMessage error={st.error} notice={st.notice} />
       <div className="transport__source">
         <div className="transport__track">
           {st.kind === 'none' ? (
@@ -64,11 +65,11 @@ export function Transport() {
           )}
         </div>
         <div className="transport__btns">
-          <button className="btn btn--sm" onClick={() => openAudioDialog()} data-tip="Open an audio file (or drop one anywhere)" data-tip-kbd="O">
+          <button className="btn btn--sm" onClick={() => openAudioDialog()} data-tip="Open an audio file from your computer: MP3, WAV, FLAC, OGG, Opus, M4A (or drop one anywhere on the page)" data-tip-kbd="O">
             <IconFolder size={14} /> <span className="btn__label">Open</span>
           </button>
           <DemoMenu />
-          <button className={`btn btn--sm btn--icon ${st.kind === 'mic' ? 'is-on' : ''}`} onClick={() => startMic()} data-tip="Use microphone" aria-label="Use microphone">
+          <button className={`btn btn--sm btn--icon ${st.kind === 'mic' ? 'is-on' : ''}`} onClick={() => startMic()} data-tip="Listen to your microphone live (nothing is recorded or sent anywhere)" aria-label="Use microphone">
             <IconMic size={14} />
           </button>
         </div>
@@ -95,7 +96,7 @@ export function Transport() {
           ) : hasTrack || st.loading ? (
             <div className="seek-empty">
               <span className="seek-empty__line" />
-              {st.loading && <span className="seek-empty__msg">Decoding…</span>}
+              {st.loading && <span className="seek-empty__msg">{st.loadingLabel ?? 'Loading…'}</span>}
             </div>
           ) : st.kind === 'mic' ? (
             <div className="seek-empty seek-empty--live">
@@ -103,17 +104,11 @@ export function Transport() {
             </div>
           ) : (
             <div className="seek-empty seek-empty--prompt">
-              <span>Drop an audio file anywhere, or</span>
-              <button className="link-btn" onClick={() => openAudioDialog()}>
-                open audio
-              </button>
-              <span>·</span>
-              <button className="link-btn" onClick={() => (engine.demos[0] ? loadDemo(engine.demos[0].id) : openAudioDialog())}>
-                try a demo
-              </button>
+              <span>No audio yet. Choose a source on the left (a file, a demo or the mic), or drop a file anywhere on the page.</span>
             </div>
           )}
-          {st.error && <div className="seek-error">{st.error}</div>}
+          {st.loading && hasTrack && st.overview && <div className="seek-loading">{st.loadingLabel ?? 'Loading…'}</div>}
+
         </div>
       </div>
 
@@ -137,13 +132,29 @@ export function Transport() {
   );
 }
 
+/** Errors and notices about the audio source, readable in full, until dismissed. */
+function SourceMessage({ error, notice }: { error: string | null; notice: string | null }) {
+  const text = error ?? notice;
+  if (!text) return null;
+  const kind = error ? 'error' : 'notice';
+  return (
+    <div className={`source-msg source-msg--${kind}`} role={error ? 'alert' : 'status'}>
+      <IconWarn size={15} className="source-msg__icon" />
+      <p className="source-msg__text">{text}</p>
+      <button className="icon-btn icon-btn--xs source-msg__close" onClick={() => engine.dismissMessage()} aria-label="Dismiss" data-tip="Dismiss">
+        <IconClose size={12} />
+      </button>
+    </div>
+  );
+}
+
 function DemoMenu() {
   const [open, setOpen] = useState(false);
   const btn = useRef<HTMLButtonElement>(null);
   const demos = engine.demos;
   return (
     <>
-      <button ref={btn} className={`btn btn--sm ${open ? 'is-open' : ''}`} onClick={() => setOpen((o) => !o)} aria-haspopup="menu" data-tip="Synthesized demo tracks">
+      <button ref={btn} className={`btn btn--sm ${open ? 'is-open' : ''}`} onClick={() => setOpen((o) => !o)} aria-haspopup="menu" data-tip="Demo tracks synthesized in your browser, each designed to show off a different feature">
         <IconMusic size={14} /> <span className="btn__label">Demos</span> <IconChevron size={12} className="btn__chev" />
       </button>
       <Popover anchor={btn} open={open} onClose={() => setOpen(false)} placement="top-start" className="menu demo-menu">

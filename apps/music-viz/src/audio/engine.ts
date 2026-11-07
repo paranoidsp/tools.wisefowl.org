@@ -19,6 +19,7 @@ import { DEMOS, renderDemo } from './demos';
 import { FeatureExtractor } from './features';
 import { computeOverview } from './overview';
 import { createFeatures } from './spectral';
+import { explainDecodeError, explainReadError, formatBytes, isSilent, preCheck } from './fileCheck';
 
 /** A fresh, silent AudioFeatures object sized for the settings. */
 export function silent(s: AnalysisSettings): AudioFeatures {
@@ -63,7 +64,9 @@ class Engine implements AudioEngineApi {
     duration: 0,
     playing: false,
     loading: false,
+    loadingLabel: null,
     error: null,
+    notice: null,
     volume: readPref(VOLUME_KEY, 0.8),
     loop: readPref(LOOP_KEY, true),
     overview: null,
@@ -88,6 +91,8 @@ class Engine implements AudioEngineApi {
   private micNode: MediaStreamAudioSourceNode | null = null;
 
   private loadToken = 0;
+  /** bumped by every load request; a newer request cancels an older one still decoding */
+  private pendingToken = 0;
   private extractor = new FeatureExtractor();
   private lastSmoothing = -1;
   private lastSettings: AnalysisSettings | null = null;
@@ -154,66 +159,113 @@ class Engine implements AudioEngineApi {
     return ctx;
   }
 
-  private async resumeCtx() {
+  /**
+   * Resume the AudioContext. Browsers keep it suspended until the page gets a
+   * user gesture, and resume() then stays pending (it doesn't reject), so
+   * wait at most `ms` and report whether sound is actually running.
+   */
+  private async resumeCtx(ms = 1200): Promise<boolean> {
     const ctx = this.ensureCtx();
-    if (ctx.state !== 'running') {
-      try {
-        await ctx.resume();
-      } catch {
-        /* ignore — will retry on next gesture */
-      }
+    if (ctx.state === 'running') return true;
+    try {
+      await Promise.race([ctx.resume(), new Promise((r) => setTimeout(r, ms))]);
+    } catch {
+      /* fall through to the state check */
     }
+    return (ctx.state as string) === 'running';
   }
 
   // ──────────────────────────────────────────────────────────── loading ──
 
-  async loadFile(file: File): Promise<void> {
-    const token = this.beginLoad();
-    this.set({ loading: true, error: null, name: file.name, kind: 'file' });
-    try {
-      const data = await file.arrayBuffer();
-      const ctx = this.ensureCtx();
-      let buf: AudioBuffer;
-      try {
-        buf = await ctx.decodeAudioData(data);
-      } catch {
-        throw new Error(`Couldn’t decode “${file.name}”. The browser may not support this format, or the file is damaged. Try MP3, WAV, OGG, FLAC or M4A.`);
-      }
-      if (token !== this.loadToken) return;
-      this.useBuffer(buf, 'file', file.name.replace(/\.[^.]+$/, ''), token);
-    } catch (e) {
-      if (token !== this.loadToken) return;
-      this.set({ loading: false, error: describeError(e), kind: 'none', name: '', duration: 0, overview: null });
+  async loadFile(file: File): Promise<boolean> {
+    // Checks that need no decoding: refuse early, leaving the current track alone.
+    const check = preCheck(file);
+    if (!check.ok) {
+      this.set({ error: check.error ?? 'That file can’t be played.', notice: null });
+      return false;
     }
+    const token = ++this.pendingToken;
+    const label = `“${file.name}” (${formatBytes(file.size)})`;
+    this.set({ loading: true, loadingLabel: `Reading ${label}…`, error: null, notice: check.warning ?? null });
+    const fail = (error: string) => {
+      if (token !== this.pendingToken) return false;
+      this.set({ loading: false, loadingLabel: null, error });
+      return false;
+    };
+
+    let data: ArrayBuffer;
+    try {
+      data = await file.arrayBuffer();
+    } catch (e) {
+      return fail(explainReadError(file, e));
+    }
+    if (token !== this.pendingToken) return false;
+
+    this.set({ loadingLabel: `Decoding ${label}…` });
+    let buf: AudioBuffer;
+    try {
+      buf = await this.ensureCtx().decodeAudioData(data);
+    } catch {
+      return fail(explainDecodeError(file));
+    }
+    if (token !== this.pendingToken) return false;
+    if (!(buf.duration > 0.05)) return fail(`“${file.name}” decoded, but it contains no audio (duration ${buf.duration.toFixed(2)} s).`);
+
+    // Success: only now replace the current source.
+    const loadToken = this.beginLoad();
+    this.useBuffer(buf, 'file', file.name.replace(/\.[^.]+$/, ''), loadToken);
+    if (isSilent(buf)) this.set({ notice: `“${file.name}” loaded, but it seems to be silent, so the visuals won’t move much.` });
+    else if (check.warning) this.set({ notice: null });
+    return true;
   }
 
-  async loadDemo(id: string): Promise<void> {
+  async loadDemo(id: string): Promise<boolean> {
     const demo = DEMOS.find((d) => d.id === id);
-    const token = this.beginLoad();
-    this.set({ loading: true, error: null, name: demo?.name ?? id, kind: 'demo' });
+    const name = demo?.name ?? id;
+    const token = ++this.pendingToken;
+    this.set({ loading: true, loadingLabel: `Synthesizing “${name}” in your browser…`, error: null, notice: null });
     try {
       this.ensureCtx();
       const buf = await renderDemo(id);
-      if (token !== this.loadToken) return;
-      this.useBuffer(buf, 'demo', demo?.name ?? id, token);
+      if (token !== this.pendingToken) return false;
+      const loadToken = this.beginLoad();
+      this.useBuffer(buf, 'demo', name, loadToken);
+      return true;
     } catch (e) {
-      if (token !== this.loadToken) return;
-      this.set({ loading: false, error: `Couldn’t synthesize the demo: ${describeError(e)}`, kind: 'none', name: '', duration: 0, overview: null });
+      if (token !== this.pendingToken) return false;
+      this.set({ loading: false, loadingLabel: null, error: `Couldn’t synthesize the “${name}” demo: ${describeError(e)}` });
+      return false;
     }
   }
 
+  unlock(): void {
+    try {
+      const ctx = this.ensureCtx();
+      if (ctx.state !== 'running') void ctx.resume().catch(() => {});
+    } catch {
+      /* no Web Audio at all; reported when something tries to play */
+    }
+  }
+
+  dismissMessage(): void {
+    if (this._state.error || this._state.notice) this.set({ error: null, notice: null });
+  }
+
   async useMicrophone(): Promise<void> {
-    const token = this.beginLoad();
-    this.set({ loading: true, error: null, name: 'Microphone', kind: 'mic' });
+    // Ask for the mic first: if that fails, whatever is playing keeps playing.
+    const pending = ++this.pendingToken;
+    this.set({ loading: true, loadingLabel: 'Waiting for microphone permission…', error: null, notice: null });
+    let token = -1;
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('This browser has no microphone support (or the page isn’t served over https).');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
       });
-      if (token !== this.loadToken) {
+      if (pending !== this.pendingToken) {
         stream.getTracks().forEach((t) => t.stop());
         return;
       }
+      token = this.beginLoad();
       const ctx = this.ensureCtx();
       await this.resumeCtx();
       this.mic = stream;
@@ -227,10 +279,15 @@ class Engine implements AudioEngineApi {
         }
       });
       const label = stream.getAudioTracks()[0]?.label;
-      this.set({ loading: false, playing: true, duration: 0, overview: null, name: label ? `Mic — ${label}` : 'Microphone' });
+      this.set({ kind: 'mic', loading: false, loadingLabel: null, playing: true, duration: 0, overview: null, name: label ? `Mic — ${label}` : 'Microphone' });
     } catch (e) {
-      if (token !== this.loadToken) return;
-      this.set({ loading: false, playing: false, error: describeError(e), kind: 'none', name: '' });
+      if (pending !== this.pendingToken) return;
+      if (token === -1) {
+        // permission/device failed before we touched the current source: keep it
+        this.set({ loading: false, loadingLabel: null, error: describeError(e) });
+      } else if (token === this.loadToken) {
+        this.set({ loading: false, loadingLabel: null, playing: false, error: describeError(e), kind: 'none', name: '' });
+      }
     }
   }
 
@@ -249,7 +306,7 @@ class Engine implements AudioEngineApi {
     this.buffer = buf;
     this.offset = 0;
     this.extractor.reset();
-    this.set({ kind, name, duration: buf.duration, loading: false, error: null, overview: null, playing: false });
+    this.set({ kind, name, duration: buf.duration, loading: false, loadingLabel: null, error: null, overview: null, playing: false });
     computeOverview(buf, 1200, () => token !== this.loadToken)
       .then((ov) => {
         if (ov && token === this.loadToken) this.set({ overview: ov });
@@ -323,6 +380,9 @@ class Engine implements AudioEngineApi {
   }
 
   async play(): Promise<void> {
+    // Kick the context synchronously: when play() is called from a click or
+    // keypress, this is the moment the browser allows sound to start.
+    this.unlock();
     if (this._state.kind === 'mic') {
       if (!this.micNode) return;
       await this.resumeCtx();
@@ -341,11 +401,23 @@ class Engine implements AudioEngineApi {
         if (!this.buffer) return;
       } else return;
     }
-    await this.resumeCtx();
+    const running = await this.resumeCtx();
+    if (!running) {
+      // Autoplay policy: no sound until the page has had a click/keypress.
+      // Say so instead of silently "playing" with a frozen clock.
+      this.set({
+        playing: false,
+        notice:
+          (this.ctx?.state as string) === 'interrupted'
+            ? 'Sound was interrupted by the system (another app may be using audio). Press Play to resume.'
+            : 'The browser is holding sound back until you interact with the page. Press Play to start.',
+      });
+      return;
+    }
     if (this.node) return;
     if (this.offset >= this.buffer.duration - 0.01) this.offset = 0;
     this.startNode(this.offset);
-    this.set({ playing: true, error: null });
+    this.set({ playing: true, error: null, notice: this._state.notice?.startsWith('The browser is holding') ? null : this._state.notice });
   }
 
   pause(): void {
@@ -444,3 +516,12 @@ class Engine implements AudioEngineApi {
 export const engine: AudioEngineApi = new Engine();
 
 if (import.meta.env.DEV) (window as unknown as { __engine: AudioEngineApi }).__engine = engine;
+
+// Browsers only let audio start from a user gesture. Unlock on the first
+// click/keypress anywhere, so a later async play() (after a file has decoded)
+// isn't blocked.
+if (typeof window !== 'undefined') {
+  const unlock = () => engine.unlock();
+  window.addEventListener('pointerdown', unlock, { capture: true, passive: true });
+  window.addEventListener('keydown', unlock, { capture: true });
+}

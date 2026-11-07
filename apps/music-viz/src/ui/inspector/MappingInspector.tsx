@@ -3,21 +3,22 @@ import { createColorMapper, GRADIENT_PRESETS, gradientCss, MODE_INFO } from '../
 import { DEFAULT_ANALYSIS, DEFAULT_COLOR } from '../../core/defaults';
 import { useStore } from '../../core/store';
 import type { AnalysisSettings, ColorMode, ColorSettings, FreqScale } from '../../core/types';
-import { Row, Section, Segmented } from '../controls/basic';
+import { Description, Row, Section, Segmented, tipAttrs } from '../controls/basic';
 import { GradientEditor } from '../controls/GradientEditor';
 import { NumberControl } from '../controls/NumberControl';
 import { IconReset } from '../icons';
 import { getLatestFeatures } from '../liveFeatures';
 import { Dropdown } from '../Popover';
+import { ANALYSIS_HELP, COLOR_HELP, FFT_OPTION_HINTS, FREQ_SCALE_OPTIONS } from '../help';
 
 export const COLOR_MODES: { value: ColorMode; label: string; hint: string }[] = [
-  { value: 'light-octave', label: 'Light octave', hint: 'Fold each frequency up by octaves into visible light (≈400–790 THz) and use that wavelength’s colour.' },
-  { value: 'pitch-hue', label: 'Pitch → hue', hint: 'The 12 pitch classes go around the colour wheel in chromatic order.' },
-  { value: 'fifths-hue', label: 'Circle of fifths', hint: 'Pitch classes ordered by fifths, so related keys get neighbouring hues.' },
-  { value: 'scriabin', label: 'Scriabin', hint: 'Alexander Scriabin’s synesthetic key colours (Prometheus, 1910).' },
-  { value: 'newton', label: 'Newton', hint: 'Newton’s seven spectral colours mapped onto the diatonic scale.' },
-  { value: 'spectral', label: 'Spectral range', hint: 'Low → high frequency sweeps a hue range you choose, without octave folding.' },
-  { value: 'gradient', label: 'Custom gradient', hint: 'Low → high frequency runs through your own gradient.' },
+  { value: 'light-octave', label: 'Light octave', hint: 'Double each frequency ~40 times until it lands in visible light (≈395–790 THz) and use that wavelength’s colour.' },
+  { value: 'pitch-hue', label: 'Pitch → hue', hint: 'The 12 notes go round the colour wheel in chromatic order, 30° apart. Octaves share a colour.' },
+  { value: 'fifths-hue', label: 'Circle of fifths', hint: 'Notes ordered by fifths round the wheel, so harmonious chords and related keys get neighbouring hues.' },
+  { value: 'scriabin', label: 'Scriabin', hint: 'Alexander Scriabin’s personal, synesthetic key colours, written for Prometheus (1910).' },
+  { value: 'newton', label: 'Newton', hint: 'Newton’s seven rainbow colours matched to the seven notes of a scale (Opticks, 1704).' },
+  { value: 'spectral', label: 'Spectral range', hint: 'Low → high frequency sweeps a hue range you choose, so register shows, not harmony.' },
+  { value: 'gradient', label: 'Custom gradient', hint: 'Low → high frequency runs through your own gradient, for designed palettes.' },
 ];
 
 const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
@@ -109,7 +110,7 @@ function AnalysisReadout() {
   return (
     <div className="readout">
       <div className="readout__cell">
-        <span className="readout__label">
+        <span className="readout__label" data-tip="Beats per minute, estimated from the spacing of detected beats. The dot flashes on each beat.">
           Tempo <span className="beat-dot" ref={beat} />
         </span>
         <span className="readout__value num">
@@ -118,13 +119,13 @@ function AnalysisReadout() {
         </span>
       </div>
       <div className="readout__cell">
-        <span className="readout__label">Pitch</span>
+        <span className="readout__label" data-tip="The clearest single note right now, named using A4 tuning. Shows — for noise, drums or dense chords.">Pitch</span>
         <span className="readout__value num" ref={pitch}>
           —
         </span>
       </div>
       <div className="readout__cell readout__cell--wide">
-        <span className="readout__label">Loudness</span>
+        <span className="readout__label" data-tip="Overall loudness, as the Loudness modulation source sees it.">Loudness</span>
         <div className="meter meter--lg">
           <div className="meter__fill" ref={loud} />
         </div>
@@ -153,23 +154,34 @@ export function MappingInspector() {
           </button>
         }
       >
-        <Row label="Mode">
+        <Row label="Mode" hint={COLOR_HELP.mode}>
           <Dropdown<ColorMode> value={color.mode} options={COLOR_MODES} onChange={(mode) => setColor({ mode })} ariaLabel="Colour mode" wide />
         </Row>
-        <p className="insp-explain" data-tip={MODE_INFO[color.mode]?.explanation}>
+        <p className="insp-explain">
           <strong>{MODE_INFO[color.mode]?.short ?? mode?.hint}.</strong> {MODE_INFO[color.mode]?.short ? mode?.hint : null}
         </p>
+        {MODE_INFO[color.mode]?.explanation && (
+          <details className="insp-more">
+            <summary>How this mapping works</summary>
+            <p>{MODE_INFO[color.mode].explanation}</p>
+            <button className="link-btn" onClick={() => useStore.getState().setTab('lab')}>
+              Explore it in the Mapping Lab →
+            </button>
+          </details>
+        )}
         <PianoStrip color={color} />
         {hueBased && <NumberControl label={color.mode === 'light-octave' ? 'Fold shift' : 'Hue offset'} hint={MODE_INFO[color.mode]?.hueOffsetMeaning} value={color.hueOffset} min={-180} max={180} step={1} unit="°" bipolar defaultValue={0} onChange={(hueOffset) => setColor({ hueOffset })} />}
         {color.mode === 'spectral' && (
           <>
-            <NumberControl label="Hue start" value={color.hueStart} min={0} max={360} step={1} unit="°" defaultValue={DEFAULT_COLOR.hueStart} onChange={(hueStart) => setColor({ hueStart })} />
-            <NumberControl label="Hue end" value={color.hueEnd} min={0} max={360} step={1} unit="°" defaultValue={DEFAULT_COLOR.hueEnd} onChange={(hueEnd) => setColor({ hueEnd })} />
+            <NumberControl label="Hue start" hint={COLOR_HELP.hueStart} value={color.hueStart} min={0} max={360} step={1} unit="°" defaultValue={DEFAULT_COLOR.hueStart} onChange={(hueStart) => setColor({ hueStart })} />
+            <NumberControl label="Hue end" hint={COLOR_HELP.hueEnd} value={color.hueEnd} min={0} max={360} step={1} unit="°" defaultValue={DEFAULT_COLOR.hueEnd} onChange={(hueEnd) => setColor({ hueEnd })} />
           </>
         )}
         {color.mode === 'gradient' && (
           <div className="ctl ctl--stack">
-            <div className="ctl__label">Gradient</div>
+            <div className="ctl__label" {...tipAttrs('Gradient', COLOR_HELP.gradient)}>
+              Gradient
+            </div>
             <GradientEditor value={color.gradient} onChange={(gradient) => setColor({ gradient })} />
             <div className="grad-presets">
               {GRADIENT_PRESETS.map((g) => (
@@ -183,13 +195,14 @@ export function MappingInspector() {
                 />
               ))}
             </div>
+            <Description hint={COLOR_HELP.gradient} />
           </div>
         )}
-        <NumberControl label="Saturation" value={color.saturation} min={0} max={1} step={0.01} defaultValue={DEFAULT_COLOR.saturation} onChange={(saturation) => setColor({ saturation })} />
-        <NumberControl label="Lightness" value={color.lightness} min={0} max={1} step={0.01} defaultValue={DEFAULT_COLOR.lightness} onChange={(lightness) => setColor({ lightness })} />
+        <NumberControl label="Saturation" hint={COLOR_HELP.saturation} value={color.saturation} min={0} max={1} step={0.01} defaultValue={DEFAULT_COLOR.saturation} onChange={(saturation) => setColor({ saturation })} />
+        <NumberControl label="Lightness" hint={COLOR_HELP.lightness} value={color.lightness} min={0} max={1} step={0.01} defaultValue={DEFAULT_COLOR.lightness} onChange={(lightness) => setColor({ lightness })} />
         <NumberControl
           label="Level → light"
-          hint="How much loudness drives brightness"
+          hint={COLOR_HELP.levelToLight}
           value={color.intensityToBrightness}
           min={0}
           max={1}
@@ -197,8 +210,8 @@ export function MappingInspector() {
           defaultValue={DEFAULT_COLOR.intensityToBrightness}
           onChange={(intensityToBrightness) => setColor({ intensityToBrightness })}
         />
-        <NumberControl label="Gamma" value={color.gamma} min={0.2} max={3} step={0.01} curve="log" defaultValue={1} onChange={(gamma) => setColor({ gamma })} />
-        <NumberControl label="A4 tuning" value={color.a4} min={415} max={466} step={0.5} unit="Hz" defaultValue={440} onChange={(a4) => setColor({ a4 })} />
+        <NumberControl label="Gamma" hint={COLOR_HELP.gamma} value={color.gamma} min={0.2} max={3} step={0.01} curve="log" defaultValue={1} onChange={(gamma) => setColor({ gamma })} />
+        <NumberControl label="A4 tuning" hint={COLOR_HELP.a4} value={color.a4} min={415} max={466} step={0.5} unit="Hz" defaultValue={440} onChange={(a4) => setColor({ a4 })} />
       </Section>
 
       <Section
@@ -211,37 +224,32 @@ export function MappingInspector() {
         }
       >
         <AnalysisReadout />
-        <Row label="FFT size" hint="Bigger = finer frequency detail, slower response">
+        <Row label="FFT size" hint={ANALYSIS_HELP.fftSize}>
           <Dropdown<number>
             value={analysis.fftSize}
-            options={FFT.map((n) => ({ value: n, label: n.toLocaleString('en'), hint: n <= 2048 ? 'Fast, coarse' : n >= 8192 ? 'Detailed, laggy' : 'Balanced' }))}
+            options={FFT.map((n) => ({ value: n, label: n.toLocaleString('en'), hint: FFT_OPTION_HINTS[n] }))}
             onChange={(v) => setAnalysis({ fftSize: v as AnalysisSettings['fftSize'] })}
             ariaLabel="FFT size"
           />
         </Row>
-        <Row label="Freq scale">
+        <Row label="Freq scale" hint={ANALYSIS_HELP.freqScale}>
           <Segmented<FreqScale>
             value={analysis.freqScale}
-            options={[
-              { value: 'log', label: 'Log' },
-              { value: 'mel', label: 'Mel' },
-              { value: 'bark', label: 'Bark' },
-              { value: 'linear', label: 'Lin' },
-            ]}
+            options={FREQ_SCALE_OPTIONS.map((o) => ({ ...o }))}
             onChange={(freqScale) => setAnalysis({ freqScale })}
             ariaLabel="Frequency scale"
           />
         </Row>
-        <NumberControl label="Bands" value={analysis.bandCount} min={8} max={256} step={1} defaultValue={64} onChange={(bandCount) => setAnalysis({ bandCount })} />
-        <NumberControl label="Min freq" value={analysis.minFreq} min={20} max={2000} step={1} curve="log" unit="Hz" defaultValue={DEFAULT_ANALYSIS.minFreq} onChange={(minFreq) => setAnalysis({ minFreq })} />
-        <NumberControl label="Max freq" value={analysis.maxFreq} min={1000} max={22050} step={10} curve="log" unit="Hz" defaultValue={DEFAULT_ANALYSIS.maxFreq} onChange={(maxFreq) => setAnalysis({ maxFreq })} />
-        <NumberControl label="Smoothing" value={analysis.smoothing} min={0} max={0.99} step={0.01} defaultValue={DEFAULT_ANALYSIS.smoothing} onChange={(smoothing) => setAnalysis({ smoothing })} />
-        <NumberControl label="Floor" value={analysis.minDb} min={-140} max={-40} step={1} unit="dB" defaultValue={DEFAULT_ANALYSIS.minDb} onChange={(minDb) => setAnalysis({ minDb: Math.min(minDb, analysis.maxDb - 10) })} />
-        <NumberControl label="Ceiling" value={analysis.maxDb} min={-60} max={0} step={1} unit="dB" defaultValue={DEFAULT_ANALYSIS.maxDb} onChange={(maxDb) => setAnalysis({ maxDb: Math.max(maxDb, analysis.minDb + 10) })} />
-        <NumberControl label="Gain" value={analysis.gain} min={0.1} max={4} step={0.01} curve="log" unit="×" defaultValue={1} onChange={(gain) => setAnalysis({ gain })} />
-        <NumberControl label="Beat sens." hint="Onset detection sensitivity: higher = more beats" value={analysis.beatSensitivity} min={0} max={1} step={0.01} defaultValue={DEFAULT_ANALYSIS.beatSensitivity} onChange={(beatSensitivity) => setAnalysis({ beatSensitivity })} />
-        <NumberControl label="Beat decay" value={analysis.beatDecay} min={0.05} max={2} step={0.01} unit="s" curve="log" defaultValue={DEFAULT_ANALYSIS.beatDecay} onChange={(beatDecay) => setAnalysis({ beatDecay })} />
-        <NumberControl label="Feature smooth" hint="Extra smoothing on loudness, bass, etc." value={analysis.featureSmoothing} min={0} max={0.99} step={0.01} defaultValue={DEFAULT_ANALYSIS.featureSmoothing} onChange={(featureSmoothing) => setAnalysis({ featureSmoothing })} />
+        <NumberControl label="Bands" hint={ANALYSIS_HELP.bands} value={analysis.bandCount} min={8} max={256} step={1} defaultValue={64} onChange={(bandCount) => setAnalysis({ bandCount })} />
+        <NumberControl label="Min freq" hint={ANALYSIS_HELP.minFreq} value={analysis.minFreq} min={20} max={2000} step={1} curve="log" unit="Hz" defaultValue={DEFAULT_ANALYSIS.minFreq} onChange={(minFreq) => setAnalysis({ minFreq })} />
+        <NumberControl label="Max freq" hint={ANALYSIS_HELP.maxFreq} value={analysis.maxFreq} min={1000} max={22050} step={10} curve="log" unit="Hz" defaultValue={DEFAULT_ANALYSIS.maxFreq} onChange={(maxFreq) => setAnalysis({ maxFreq })} />
+        <NumberControl label="Smoothing" hint={ANALYSIS_HELP.smoothing} value={analysis.smoothing} min={0} max={0.99} step={0.01} defaultValue={DEFAULT_ANALYSIS.smoothing} onChange={(smoothing) => setAnalysis({ smoothing })} />
+        <NumberControl label="Floor" hint={ANALYSIS_HELP.minDb} value={analysis.minDb} min={-140} max={-40} step={1} unit="dB" defaultValue={DEFAULT_ANALYSIS.minDb} onChange={(minDb) => setAnalysis({ minDb: Math.min(minDb, analysis.maxDb - 10) })} />
+        <NumberControl label="Ceiling" hint={ANALYSIS_HELP.maxDb} value={analysis.maxDb} min={-60} max={0} step={1} unit="dB" defaultValue={DEFAULT_ANALYSIS.maxDb} onChange={(maxDb) => setAnalysis({ maxDb: Math.max(maxDb, analysis.minDb + 10) })} />
+        <NumberControl label="Gain" hint={ANALYSIS_HELP.gain} value={analysis.gain} min={0.1} max={4} step={0.01} curve="log" unit="×" defaultValue={1} onChange={(gain) => setAnalysis({ gain })} />
+        <NumberControl label="Beat sens." hint={ANALYSIS_HELP.beatSensitivity} value={analysis.beatSensitivity} min={0} max={1} step={0.01} defaultValue={DEFAULT_ANALYSIS.beatSensitivity} onChange={(beatSensitivity) => setAnalysis({ beatSensitivity })} />
+        <NumberControl label="Beat decay" hint={ANALYSIS_HELP.beatDecay} value={analysis.beatDecay} min={0.05} max={2} step={0.01} unit="s" curve="log" defaultValue={DEFAULT_ANALYSIS.beatDecay} onChange={(beatDecay) => setAnalysis({ beatDecay })} />
+        <NumberControl label="Feature smooth" hint={ANALYSIS_HELP.featureSmoothing} value={analysis.featureSmoothing} min={0} max={0.99} step={0.01} defaultValue={DEFAULT_ANALYSIS.featureSmoothing} onChange={(featureSmoothing) => setAnalysis({ featureSmoothing })} />
       </Section>
     </>
   );

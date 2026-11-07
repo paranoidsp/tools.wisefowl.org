@@ -28,6 +28,7 @@ export const SHORTCUTS: Shortcut[] = [
   { group: 'View', keys: ['F'], label: 'Focus mode (hide panels)' },
   { group: 'View', keys: ['⇧', 'F'], label: 'Fullscreen stage' },
   { group: 'View', keys: ['P'], label: 'Snapshot PNG' },
+  { group: 'View', keys: ['I'], label: 'Describe settings (show explanations inline)' },
   { group: 'View', keys: ['R'], label: 'Start / stop recording' },
   { group: 'View', keys: ['?'], label: 'Open this guide' },
 ];
@@ -99,6 +100,11 @@ export function installShortcuts(): () => void {
       }
       case 'f':
         return run(() => s.setFocusMode(!s.focusMode));
+      case 'i':
+      case 'I': {
+        const ui = useUi.getState();
+        return run(() => ui.setShowDescriptions(!ui.showDescriptions));
+      }
       case 'F':
         return run(toggleFullscreen);
       case 'l':

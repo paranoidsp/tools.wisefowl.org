@@ -715,3 +715,20 @@
   transform: translateY(-1px);
   border-color: var(--accent, #7c9cff);
 }
+
+/* "Describe settings" mode: each setting's explanation printed under it */
+.ctl__desc {
+  grid-column: 1 / -1;
+  margin: -2px 0 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--faint, #5b606c);
+}
+.ctl:hover .ctl__desc {
+  color: var(--muted, #8a8f9c);
+}
+/* labels with an explanation get a subtle dotted underline so they invite hovering */
+.ctl__label[data-tip-title] {
+  text-decoration: underline dotted rgba(255, 255, 255, 0.18);
+  text-underline-offset: 3px;
+}
