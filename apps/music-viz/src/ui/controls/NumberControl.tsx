@@ -234,7 +234,7 @@ export function NumberControl(p: NumberControlProps) {
       {!p.noLabel && (
         <div
           className="ctl__label ctl__label--scrub"
-          title={p.hint}
+          title={p.hint ? `${p.label} — ${p.hint}` : p.label}
           onPointerDown={onScrubDown(false)}
           onPointerMove={onScrubMove}
           onPointerUp={onScrubUp}

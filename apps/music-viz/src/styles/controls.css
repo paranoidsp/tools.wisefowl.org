@@ -213,7 +213,7 @@
 /* ──────────────────────────────────────────────────── control rows ── */
 
 .ctl {
-  --label-w: 84px;
+  --label-w: 108px;
   display: grid;
   grid-template-columns: var(--label-w) minmax(0, 1fr);
   align-items: center;
@@ -695,4 +695,23 @@
 .meter--lg {
   height: 6px;
   margin-top: 6px;
+}
+
+/* gradient presets (Mapping → Custom gradient) */
+.grad-presets {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+.grad-presets__swatch {
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.07));
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+.grad-presets__swatch:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent, #7c9cff);
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { createColorMapper } from '../../color';
+import { createColorMapper, GRADIENT_PRESETS, gradientCss, MODE_INFO } from '../../color';
 import { DEFAULT_ANALYSIS, DEFAULT_COLOR } from '../../core/defaults';
 import { useStore } from '../../core/store';
 import type { AnalysisSettings, ColorMode, ColorSettings, FreqScale } from '../../core/types';
@@ -156,9 +156,11 @@ export function MappingInspector() {
         <Row label="Mode">
           <Dropdown<ColorMode> value={color.mode} options={COLOR_MODES} onChange={(mode) => setColor({ mode })} ariaLabel="Colour mode" wide />
         </Row>
-        <p className="insp-explain">{mode?.hint}</p>
+        <p className="insp-explain" data-tip={MODE_INFO[color.mode]?.explanation}>
+          <strong>{MODE_INFO[color.mode]?.short ?? mode?.hint}.</strong> {MODE_INFO[color.mode]?.short ? mode?.hint : null}
+        </p>
         <PianoStrip color={color} />
-        {hueBased && <NumberControl label="Hue offset" value={color.hueOffset} min={-180} max={180} step={1} unit="°" bipolar defaultValue={0} onChange={(hueOffset) => setColor({ hueOffset })} />}
+        {hueBased && <NumberControl label={color.mode === 'light-octave' ? 'Fold shift' : 'Hue offset'} hint={MODE_INFO[color.mode]?.hueOffsetMeaning} value={color.hueOffset} min={-180} max={180} step={1} unit="°" bipolar defaultValue={0} onChange={(hueOffset) => setColor({ hueOffset })} />}
         {color.mode === 'spectral' && (
           <>
             <NumberControl label="Hue start" value={color.hueStart} min={0} max={360} step={1} unit="°" defaultValue={DEFAULT_COLOR.hueStart} onChange={(hueStart) => setColor({ hueStart })} />
@@ -169,6 +171,18 @@ export function MappingInspector() {
           <div className="ctl ctl--stack">
             <div className="ctl__label">Gradient</div>
             <GradientEditor value={color.gradient} onChange={(gradient) => setColor({ gradient })} />
+            <div className="grad-presets">
+              {GRADIENT_PRESETS.map((g) => (
+                <button
+                  key={g.id}
+                  className="grad-presets__swatch"
+                  style={{ background: gradientCss(g.stops) }}
+                  onClick={() => setColor({ gradient: structuredClone(g.stops) })}
+                  data-tip={g.name}
+                  aria-label={`Gradient preset ${g.name}`}
+                />
+              ))}
+            </div>
           </div>
         )}
         <NumberControl label="Saturation" value={color.saturation} min={0} max={1} step={0.01} defaultValue={DEFAULT_COLOR.saturation} onChange={(saturation) => setColor({ saturation })} />
