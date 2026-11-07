@@ -1,6 +1,6 @@
 ---
 created: 2026-11-06 18:04:41
-updated: 2026-11-06 18:40:00
+updated: 2026-11-07 10:35:00
 creators: [human, claude-opus-5-5]
 type: plan
 status: active
@@ -123,3 +123,39 @@ screenshots), add a smoke test to the site's suite, build, and deploy.
   `.node-version`, the CI build step and `build_config` in Terraform (plan
   checked; apply waits until the app is on main). Fixed the test static
   server to resolve `dir/` to `index.html`, as Pages does.
+- **2026-11-06 18:46** — The UI, 3D and audio agents have landed and are committed.
+  - Core follow-ups from their reports: WebGL layer thumbnails are now a 2D
+    copy taken right after render, `stage.time()` is a shared clock for the
+    LFO meters, and the stage is no longer re-measured every frame (that
+    forced a layout each frame).
+  - 3D compositing: use premultiplied alpha, and premultiplied additive
+    blending (`ADD_PREMUL`) instead of three's `AdditiveBlending`, which drew
+    dark halos.
+  - Audio: the demos are synthesized directly in JS, because rendering them
+    with Web Audio nodes offline was too slow. Loading a track doesn't
+    auto-play; the UI calls `play()`.
+  - Waiting on the 2D and gallery/colour agents.
+
+- **(next day)** The 2D and gallery agents hit the 5-hour usage limit
+  mid-run and were resumed after the reset. Gallery thumbnails switched from
+  image encoding, which was slow on GPU readback, to in-memory canvases
+  rendered lazily.
+- **2026-11-07 10:35** — Integration and QA. All five agents have landed: 16
+  visualizations (11 2D, 5 3D), 63 presets, 34 curated scenes.
+  - A validator confirms every scene and preset param, option and range
+    against the viz definitions.
+  - Swept all 34 scenes in headless Chromium on the GPU while a demo played:
+    48–60 fps, frame time 1–5 ms, zero errors. A contact sheet reviewed by
+    eye looks good.
+  - Hooked `MODE_INFO` and `GRADIENT_PRESETS` into the Mapping inspector,
+    and widened the param labels.
+  - `tests/music-viz.spec.js` added; the full suite passes (52/52).
+
+## Backlog (post-v1 ideas)
+- Tie the chroma/pitch reference to `color.a4` (needs `a4` in
+  `AnalysisSettings`); make the band tilt (+3 dB/oct) a setting.
+- Layer solo; layer groups/masks; per-layer post effects.
+- MIDI input, and MIDI-learn for any knob.
+- Keyframes or an automation timeline per param.
+- Code-split three.js: the bundle is 1.1 MB, 312 KB gzipped.
+- Shareable project links (encode the project into the URL hash).

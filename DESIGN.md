@@ -10,8 +10,9 @@ built to these conventions.
 1. **Runs entirely in the browser.** No server, no uploads, no accounts. The
    file the user picks never leaves their device. Say so, out loud, in the
    subtitle — it is the product's main promise.
-2. **No build step.** Each tool is a single standalone `.html` file in the repo
-   root. Dependencies come from a CDN (unpkg / jsdelivr) via `<script>` tags.
+2. **No build step (for simple tools).** Each tool is a single standalone `.html` file in the repo
+   root. Exception: full applications (e.g. Music Viz Studio) live in
+   `apps/<name>/` with a Vite build — see README. Dependencies come from a CDN (unpkg / jsdelivr) via `<script>` tags.
    Anyone can open the file and read the whole thing top to bottom.
 3. **Self-contained.** Tool-specific CSS lives in an inline `<style>` block; the
    shared `style.css` handles the frame (layout, header, footer, typography).

@@ -13,8 +13,9 @@ Inspired by [Simon Willison's tools](https://tools.simonwillison.net) — a wond
 
 ## How it works
 
-- Plain HTML/CSS/JS — no build step, no framework
-- Each tool is a standalone `.html` file in the root
+- Most tools are plain HTML/CSS/JS — a standalone `.html` file in the root, no framework
+- Bigger apps live in `apps/<name>/` (Vite + TypeScript) and are built into `/<name>/`; currently [Music Viz Studio](apps/music-viz/PLAN.md)
+- `npm run build` (`scripts/build.mjs`) builds the apps and assembles the deployable site into `dist/`
 - Private experiments live in `/private/`, gated by Cloudflare Zero Trust (`@wisefowl.org` only)
 - Deployed via Cloudflare Pages (auto-deploys on push)
 
@@ -50,6 +51,7 @@ is never modified. See [`tests/README.md`](tests/README.md) for details.
 
 ```sh
 npm install && npm run setup   # once
+npm run build                  # builds apps/ (music-viz) so tests can load them
 npm test                       # run all specs
 ```
 
@@ -60,8 +62,9 @@ site — Cloudflare Pages only serves the static files.
 ## Deploy
 
 - **Platform**: Cloudflare Pages
-- **Build command**: (none)
-- **Output directory**: `/`
+- **Build command**: `npm run build`
+- **Output directory**: `dist`
+- Config lives in Terraform: `tf-resources/wisefowl-org.tf` (`cloudflare_pages_project.tools_wisefowl_org`)
 - **Custom domain**: `tools.wisefowl.org`
 
 ## Auth
