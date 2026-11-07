@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>2D viz harness (dev only)</title>
+    <style>
+      html, body { margin: 0; background: #000; color: #ccc; font: 12px system-ui, sans-serif; }
+      #root { display: flex; flex-wrap: wrap; gap: 4px; }
+      .tile { position: relative; }
+      .tile span { position: absolute; left: 6px; top: 4px; color: #fff; text-shadow: 0 0 3px #000; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/viz/_harness/main.ts"></script>
+  </body>
+</html>

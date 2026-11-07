@@ -16,11 +16,15 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.wasm': 'application/wasm',
   '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.png': 'image/png',
+  '.woff2': 'font/woff2',
 };
 
 const server = http.createServer((req, res) => {
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
-  if (urlPath === '/') urlPath = '/index.html';
+  // Directory URLs resolve to their index.html, as on Cloudflare Pages.
+  if (urlPath.endsWith('/')) urlPath += 'index.html';
   const filePath = path.join(ROOT, urlPath);
   // Keep requests inside the repo root.
   if (!filePath.startsWith(ROOT)) {

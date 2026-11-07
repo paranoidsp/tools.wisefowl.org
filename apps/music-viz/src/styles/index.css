@@ -1,0 +1,13 @@
+@import './tokens.css';
+@import './base.css';
+@import './shell.css';
+@import './controls.css';
+@import './panels.css';
+@import './transport.css';
+@import './overlays.css';
+@import './guide.css';
+
+/* full-width feature views (gallery / lab) get a neutral canvas */
+.view--feature {
+  background: var(--bg);
+}

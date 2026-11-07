@@ -1,8 +1,9 @@
 {
   "name": "tools.wisefowl.org",
   "private": true,
-  "description": "Browser-based tools for tools.wisefowl.org. The site itself has no build step; this package.json exists only for the dev-time test suite.",
+  "description": "Browser-based tools for tools.wisefowl.org. Most tools are static files; apps/ (e.g. music-viz) are built with Vite. `npm run build` assembles the deployable site into dist/.",
   "scripts": {
+    "build": "node scripts/build.mjs",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "setup": "playwright install chromium"
