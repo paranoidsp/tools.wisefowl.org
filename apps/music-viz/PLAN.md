@@ -1,6 +1,6 @@
 ---
 created: 2026-11-06 18:04:41
-updated: 2026-11-07 10:35:00
+updated: 2026-11-07 17:55:00
 creators: [human, claude-opus-5-5]
 type: plan
 status: active
@@ -150,6 +150,13 @@ screenshots), add a smoke test to the site's suite, build, and deploy.
   - Hooked `MODE_INFO` and `GRADIENT_PRESETS` into the Mapping inspector,
     and widened the param labels.
   - `tests/music-viz.spec.js` added; the full suite passes (52/52).
+
+- **2026-11-07 17:55** — **Live** at https://tools.wisefowl.org/music-viz/. Applied the
+  Pages `build_config` with Terraform (Web Analytics tag preserved), merged
+  tf-resources#2 and tools.wisefowl.org#3, and the first build deployed
+  within about 30 s. A browser check on the live site passed: demo plays,
+  56 fps, no console errors, gallery renders. Unknown paths such as `/apps/…`
+  return Pages' fallback page, not source files.
 
 ## Backlog (post-v1 ideas)
 - Tie the chroma/pitch reference to `color.a4` (needs `a4` in
