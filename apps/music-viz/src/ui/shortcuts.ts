@@ -1,7 +1,7 @@
 /** Global keyboard shortcuts (ignored while typing in inputs). */
 import { engine } from '../audio/engine';
 import { useStore, type TabId } from '../core/store';
-import { exportProject, openAudioDialog, snapshot, toggleFullscreen, togglePlay, toggleRecording } from './actions';
+import { exportProject, openAudioDialog, rollRandom, saveCheckpoint, shuffleSelectedLayer, snapshot, toggleFullscreen, togglePlay, toggleRecording } from './actions';
 import { useUi } from './uiStore';
 
 export interface Shortcut {
@@ -23,7 +23,11 @@ export const SHORTCUTS: Shortcut[] = [
   { group: 'Layers', keys: ['Delete'], label: 'Delete layer' },
   { group: 'Edit', keys: ['⌘/Ctrl', 'Z'], label: 'Undo' },
   { group: 'Edit', keys: ['⇧', '⌘/Ctrl', 'Z'], label: 'Redo' },
-  { group: 'Edit', keys: ['⌘/Ctrl', 'S'], label: 'Export project JSON' },
+  { group: 'Edit', keys: ['⌘/Ctrl', 'S'], label: 'Save a checkpoint (and name it)' },
+  { group: 'Edit', keys: ['⇧', '⌘/Ctrl', 'S'], label: 'Export project JSON' },
+  { group: 'Explore', keys: ['G'], label: 'Random visualization (the current one stays in History)' },
+  { group: 'Explore', keys: ['⇧', 'G'], label: 'Shuffle the selected layer’s settings' },
+  { group: 'Explore', keys: ['Y'], label: 'Show Layers / History' },
   { group: 'View', keys: ['1', '–', '4'], label: 'Studio · Gallery · Lab · Guide' },
   { group: 'View', keys: ['F'], label: 'Focus mode (hide panels)' },
   { group: 'View', keys: ['⇧', 'F'], label: 'Fullscreen stage' },
@@ -66,7 +70,8 @@ export function installShortcuts(): () => void {
       if (lower === 'z' && !e.shiftKey) return run(s.undo);
       if ((lower === 'z' && e.shiftKey) || lower === 'y') return run(s.redo);
       if (lower === 'd' && sel) return run(() => s.duplicateLayer(sel));
-      if (lower === 's') return run(exportProject);
+      if (lower === 's' && e.shiftKey) return run(exportProject);
+      if (lower === 's') return run(saveCheckpoint);
       return;
     }
     if (e.altKey) return;
@@ -100,6 +105,15 @@ export function installShortcuts(): () => void {
       }
       case 'f':
         return run(() => s.setFocusMode(!s.focusMode));
+      case 'g':
+        return run(() => rollRandom());
+      case 'G':
+        return run(shuffleSelectedLayer);
+      case 'y':
+      case 'Y': {
+        const ui = useUi.getState();
+        return run(() => ui.setLeftView(ui.leftView === 'history' ? 'layers' : 'history'));
+      }
       case 'i':
       case 'I': {
         const ui = useUi.getState();

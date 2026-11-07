@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { stage } from '../core/stage';
 import { useStore, type TabId } from '../core/store';
-import { exportProject, openProjectDialog, snapshot, toggleFullscreen, toggleRecording } from './actions';
-import { IconArrowLeft, IconCamera, IconDownload, IconFocus, IconFullscreen, IconMark, IconRecord, IconRedo, IconStop, IconUndo, IconUpload } from './icons';
+import { exportProject, getWildness, openProjectDialog, rollRandom, setWildness, shuffleSelectedLayer, snapshot, toggleFullscreen, toggleRecording, type Wildness } from './actions';
+import { Popover } from './Popover';
+import { useHistory } from '../core/history';
+import { IconArrowLeft, IconCheck, IconChevron, IconDice, IconCamera, IconDownload, IconFocus, IconFullscreen, IconMark, IconRecord, IconRedo, IconStop, IconUndo, IconUpload } from './icons';
 import { MOD_KEY, SHIFT_KEY } from './Tooltip';
 import { useUi } from './uiStore';
 import { fmtTime } from './useEngine';
@@ -13,6 +15,87 @@ const TABS: { id: TabId; label: string; key: string }[] = [
   { id: 'lab', label: 'Mapping Lab', key: '3' },
   { id: 'guide', label: 'Guide', key: '4' },
 ];
+
+/** "Saved" indicator next to the project name: autosave is otherwise invisible. */
+function SaveState() {
+  const savedAt = useHistory((s) => s.savedAt);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => tick((n) => n + 1), 10_000);
+    return () => clearInterval(id);
+  }, []);
+  if (!savedAt) return null;
+  const s = Math.round((Date.now() - savedAt) / 1000);
+  const when = s < 10 ? 'just now' : s < 60 ? `${s}s ago` : `${Math.round(s / 60)} min ago`;
+  return (
+    <button className="save-state" onClick={() => useUi.getState().setLeftView('history')} data-tip={`Auto-saved in this browser ${when}. Open History to see checkpoints.`}>
+      Saved
+    </button>
+  );
+}
+
+const WILD_OPTS: { id: Wildness; label: string; hint: string }[] = [
+  { id: 'mild', label: 'Mild', hint: 'Stays close to the presets: polished, a little predictable' },
+  { id: 'medium', label: 'Medium', hint: 'Varies settings noticeably around the presets' },
+  { id: 'wild', label: 'Wild', hint: 'Strays far: odd blends, extreme settings, surprises (and some duds)' },
+];
+
+/** 🎲 Random visualization, plus a menu for how wild and for shuffling one layer. */
+function RandomButton() {
+  const [open, setOpen] = useState(false);
+  const [wild, setWild] = useState<Wildness>(getWildness());
+  const caret = useRef<HTMLButtonElement>(null);
+  return (
+    <div className="split-btn">
+      <button
+        className="btn btn--sm split-btn__main"
+        onClick={() => rollRandom(wild)}
+        data-tip="Try a random visualization: a few random layers built from presets, with settings varied around them. The one you leave stays in History."
+        data-tip-kbd="G"
+      >
+        <IconDice size={14} /> <span className="btn__label">Random</span>
+      </button>
+      <button ref={caret} className={`btn btn--sm split-btn__caret ${open ? 'is-open' : ''}`} onClick={() => setOpen((o) => !o)} aria-label="Random options" data-tip="Random options">
+        <IconChevron size={12} />
+      </button>
+      <Popover anchor={caret} open={open} onClose={() => setOpen(false)} className="menu random-menu">
+        <div className="menu__heading">How far from the presets</div>
+        {WILD_OPTS.map((o) => (
+          <button
+            key={o.id}
+            className="menu__item menu__item--tall"
+            onClick={() => {
+              setWild(o.id);
+              setWildness(o.id);
+              setOpen(false);
+              rollRandom(o.id);
+            }}
+          >
+            <span className="menu__icon">{wild === o.id ? <IconCheck size={13} /> : null}</span>
+            <span className="menu__label">
+              <span>{o.label}</span>
+              <span className="menu__sub">{o.hint}</span>
+            </span>
+          </button>
+        ))}
+        <div className="menu__sep" />
+        <button
+          className="menu__item"
+          onClick={() => {
+            setOpen(false);
+            shuffleSelectedLayer();
+          }}
+        >
+          <span className="menu__icon">
+            <IconDice size={13} />
+          </span>
+          <span className="menu__label">Shuffle the selected layer’s settings</span>
+          <span className="menu__kbd">⇧G</span>
+        </button>
+      </Popover>
+    </div>
+  );
+}
 
 function ProjectName() {
   const name = useStore((s) => s.name);
@@ -108,6 +191,8 @@ export function TopBar() {
         </a>
         <span className="topbar__sep" />
         <ProjectName />
+        <SaveState />
+        <RandomButton />
       </div>
 
       <nav className="tabs" role="tablist" aria-label="Views">

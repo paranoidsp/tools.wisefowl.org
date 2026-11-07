@@ -18,6 +18,9 @@ import type {
 } from './types';
 
 export type TabId = 'studio' | 'gallery' | 'lab' | 'guide';
+
+/** Where the current document came from (shown in History). */
+export type DocOrigin = 'scene' | 'random' | 'import' | 'new' | 'restore' | 'session';
 export type InspectorTab = 'layer' | 'mapping' | 'scene';
 
 interface Doc {
@@ -36,6 +39,13 @@ export interface StoreState extends Doc {
   focusMode: boolean;
   past: Doc[];
   future: Doc[];
+  /**
+   * Bumped whenever the whole document is replaced (scene, random, import,
+   * new, restore), as opposed to edited. History uses it to freeze the
+   * previous visualization as a checkpoint and start a new one.
+   */
+  docEpoch: number;
+  docOrigin: DocOrigin;
 
   // ui
   setTab(tab: TabId): void;
@@ -61,7 +71,9 @@ export interface StoreState extends Doc {
   setName(name: string): void;
 
   // documents
-  loadScene(scene: Scene): void;
+  loadScene(scene: Scene, origin?: DocOrigin): void;
+  /** replace the document with a saved one (History restore) */
+  loadProject(file: ProjectFile, origin: DocOrigin): void;
   newProject(): void;
   exportProject(): ProjectFile;
   importProject(file: ProjectFile): void;
@@ -169,6 +181,8 @@ export const useStore = create<StoreState>()((set, get) => {
     focusMode: false,
     past: [],
     future: [],
+    docEpoch: 0,
+    docOrigin: 'session',
 
     setTab: (tab) => set({ tab }),
     setInspectorTab: (inspectorTab) => set({ inspectorTab }),
@@ -247,20 +261,25 @@ export const useStore = create<StoreState>()((set, get) => {
     setPost: (patch) => commit(`post:${Object.keys(patch).join(',')}`, (s) => ({ post: { ...s.post, ...patch } })),
     setName: (name) => commit('name', () => ({ name })),
 
-    loadScene: (scene) =>
-      commit('scene', () => {
+    loadScene: (scene, origin = 'scene') =>
+      commit('scene', (s) => {
         const doc = sceneToDoc(scene);
-        return { ...doc, selectedId: doc.layers.at(-1)?.id ?? null };
+        return { ...doc, selectedId: doc.layers.at(-1)?.id ?? null, docEpoch: s.docEpoch + 1, docOrigin: origin };
       }),
-    newProject: () => commit('new', () => ({ ...emptyDoc(), selectedId: null })),
+    loadProject: (file, origin) =>
+      commit('load', (s) => {
+        const doc = sanitize(file);
+        return { ...doc, selectedId: doc.layers.at(-1)?.id ?? null, docEpoch: s.docEpoch + 1, docOrigin: origin };
+      }),
+    newProject: () => commit('new', (s) => ({ ...emptyDoc(), selectedId: null, docEpoch: s.docEpoch + 1, docOrigin: 'new' })),
     exportProject: () => {
       const s = get();
       return { app: 'music-viz-studio', version: 1, ...structuredClone(docOf(s)) };
     },
     importProject: (file) =>
-      commit('import', () => {
+      commit('import', (s) => {
         const doc = sanitize(file);
-        return { ...doc, selectedId: doc.layers.at(-1)?.id ?? null };
+        return { ...doc, selectedId: doc.layers.at(-1)?.id ?? null, docEpoch: s.docEpoch + 1, docOrigin: 'import' };
       }),
 
     undo: () => {
@@ -289,14 +308,26 @@ useStore.subscribe((s, prev) => {
   if (s.layers === prev.layers && s.color === prev.color && s.analysis === prev.analysis && s.post === prev.post && s.name === prev.name)
     return;
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(useStore.getState().exportProject()));
-    } catch {
-      /* quota / private mode: ignore */
-    }
-  }, 400);
+  savePending = true;
+  saveTimer = setTimeout(saveProjectNow, 400);
 });
+
+let savePending = false;
+function saveProjectNow() {
+  clearTimeout(saveTimer);
+  savePending = false;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(useStore.getState().exportProject()));
+  } catch {
+    /* quota / private mode: ignore */
+  }
+}
+// Don't lose the last edit if the tab closes or reloads inside the debounce window.
+if (typeof window !== 'undefined') {
+  const flush = () => savePending && saveProjectNow();
+  window.addEventListener('pagehide', flush);
+  window.addEventListener('beforeunload', flush);
+}
 
 export function selectedLayer(s: StoreState): Layer | undefined {
   return s.layers.find((l) => l.id === s.selectedId);

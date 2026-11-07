@@ -21,6 +21,7 @@ import {
   type Thumb,
 } from './thumbs';
 import './gallery.css';
+import { rollRandom } from '../../ui/actions';
 
 /** tag chips shown; the rest are reachable through search */
 const MAX_CHIPS = 14;
@@ -195,6 +196,8 @@ export function GalleryView() {
     const st = useStore.getState();
     st.newProject();
     st.addLayer(def.id, presetIndex);
+    const preset = presetIndex != null ? def.presets?.[presetIndex] : undefined;
+    st.setName(preset ? `${def.name} · ${preset.name}` : def.name);
     st.setTab('studio');
   };
 
@@ -207,6 +210,9 @@ export function GalleryView() {
             <p className="gal-sub">
               Curated scenes to start from. Each is a full layer stack with its own colour mapping and post effects. Hover to preview live, then open one and make it yours.
             </p>
+            <button className="btn btn--sm gal-random" onClick={() => rollRandom()} data-tip="A random visualization built from presets; what you leave behind stays in History" data-tip-kbd="G">
+              🎲 Surprise me
+            </button>
           </div>
           <label className="gal-search">
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">

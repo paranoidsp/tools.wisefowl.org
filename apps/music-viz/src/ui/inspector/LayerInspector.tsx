@@ -7,7 +7,8 @@ import { Section } from '../controls/basic';
 import { LiveBus, LiveContext } from '../controls/live';
 import { NumberControl } from '../controls/NumberControl';
 import { ParamControl } from '../controls/ParamControl';
-import { IconCube, IconLayers, IconPlus, IconReset, IconSquare, IconWarn } from '../icons';
+import { IconCube, IconDice, IconLayers, IconPlus, IconReset, IconSquare, IconWarn } from '../icons';
+import { shuffleSelectedLayer } from '../actions';
 import { Dropdown } from '../Popover';
 import { useUi } from '../uiStore';
 import { Row } from '../controls/basic';
@@ -114,6 +115,15 @@ export function LayerInspector() {
             />
             </div>
           )}
+          <button
+            className="btn btn--ghost btn--sm btn--icon"
+            onClick={() => shuffleSelectedLayer()}
+            data-tip="Shuffle: vary this layer’s settings around where they are now (undo with ⌘Z if you don’t like it)"
+            data-tip-kbd="⇧G"
+            aria-label="Shuffle settings"
+          >
+            <IconDice size={14} />
+          </button>
           <button className="btn btn--ghost btn--sm" onClick={() => s.resetLayerParams(id)} data-tip={LAYER_HELP.reset}>
             <IconReset size={13} /> Reset
           </button>

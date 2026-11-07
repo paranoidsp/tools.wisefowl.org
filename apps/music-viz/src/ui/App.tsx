@@ -15,6 +15,7 @@ import { TooltipLayer } from './Tooltip';
 import { TopBar } from './TopBar';
 import { Transport } from './Transport';
 import { dismissToast, useUi } from './uiStore';
+import { HistoryView } from './HistoryPanel';
 
 const RIGHT_KEY = 'mvs:inspector-width';
 
@@ -22,6 +23,7 @@ export function App() {
   const tab = useStore((s) => s.tab);
   const focus = useStore((s) => s.focusMode);
   const drawer = useUi((s) => s.drawer);
+  const leftView = useUi((s) => s.leftView);
   const [rightW, setRightW] = useState(() => Number(localStorage.getItem(RIGHT_KEY)) || 0);
 
   useEffect(() => installShortcuts(), []);
@@ -43,7 +45,7 @@ export function App() {
         <div className="studio" aria-hidden={tab !== 'studio'}>
           <aside className="panel panel--left" aria-label="Layers">
             <div className="panel__inner">
-              <LayersPanel />
+              {leftView === 'layers' ? <LayersPanel /> : <HistoryView />}
             </div>
           </aside>
           <main className="center">
@@ -122,6 +124,17 @@ function Toasts() {
         <div key={t.id} className={`toast toast--${t.kind}`}>
           <span className="toast__icon">{t.kind === 'error' ? <IconWarn size={14} /> : t.kind === 'success' ? <IconCheck size={14} /> : <span className="toast__dot" />}</span>
           <span className="toast__msg">{t.message}</span>
+          {t.action && (
+            <button
+              className="toast__action"
+              onClick={() => {
+                t.action!.run();
+                dismissToast(t.id);
+              }}
+            >
+              {t.action.label}
+            </button>
+          )}
           <button className="toast__x" onClick={() => dismissToast(t.id)} aria-label="Dismiss">
             <IconClose size={12} />
           </button>

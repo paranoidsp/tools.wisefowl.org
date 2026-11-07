@@ -6,6 +6,7 @@
 @import './transport.css';
 @import './overlays.css';
 @import './guide.css';
+@import './history.css';
 
 /* full-width feature views (gallery / lab) get a neutral canvas */
 .view--feature {
