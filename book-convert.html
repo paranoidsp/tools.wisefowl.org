@@ -1395,6 +1395,12 @@ ${sections.join('\n')}
         dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
         dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) openFile(e.dataTransfer.files[0]); });
+        // iOS/iPadOS Safari greys out every file whose type it can't map to
+        // the accept list — and it has no type for .mobi/.azw3/.fb2, so those
+        // could never be picked. Files are identified by content anyway, so
+        // drop the filter there. (iPadOS reports itself as a Mac with touch.)
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+        if (isIOS) fileInput.removeAttribute('accept');
         fileInput.addEventListener('change', () => { if (fileInput.files[0]) openFile(fileInput.files[0]); fileInput.value = ''; });
         $('clear-btn').addEventListener('click', reset);
 
