@@ -432,3 +432,20 @@ test('unsupported files show an inline error', async ({ page }) => {
   await expect(page.locator('#load-error')).toContainText('.xyz files aren’t supported');
   await expect(page.locator('#drop-zone')).toBeVisible();
 });
+
+test.describe('on iPad Safari', () => {
+  // iPadOS Safari presents itself as desktop Safari on a Mac with touch.
+  test.use({
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15',
+    hasTouch: true,
+  });
+  test('the file picker has no type filter, so .mobi files can be chosen', async ({ page }) => {
+    await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'maxTouchPoints', { get: () => 5 }));
+    await page.goto('/book-convert.html');
+    await expect(page.locator('#file-input')).not.toHaveAttribute('accept', /.*/);
+  });
+});
+
+test('desktop keeps the file type filter', async ({ page }) => {
+  await expect(page.locator('#file-input')).toHaveAttribute('accept', /\.mobi/);
+});
