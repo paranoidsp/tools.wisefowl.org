@@ -9,12 +9,16 @@
     "setup": "playwright install chromium"
   },
   "devDependencies": {
-    "@playwright/test": "^1.49.0",
     "@ffmpeg/core": "0.12.6",
     "@ffmpeg/ffmpeg": "0.12.10",
     "@ffmpeg/util": "0.12.1",
+    "@playwright/test": "^1.49.0",
+    "foliate-js": "github:johnfactotum/foliate-js#78914aef4466eb960965702401634c2cb348e9b1",
     "jszip": "3.10.1",
+    "mammoth": "1.13.0",
+    "marked": "18.2.0",
     "pdf-lib": "1.17.1",
-    "pdfjs-dist": "4.9.155"
+    "pdfjs-dist": "4.9.155",
+    "turndown": "7.2.5"
   }
 }
