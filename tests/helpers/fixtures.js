@@ -20,11 +20,17 @@ const MIME = {
 
 // https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js -> @ffmpeg/ffmpeg/dist/umd/ffmpeg.js
 // https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.min.mjs -> pdfjs-dist/build/pdf.min.mjs
+// https://cdn.jsdelivr.net/gh/johnfactotum/foliate-js@<sha>/mobi.js -> foliate-js/mobi.js
 function localPathFor(url) {
   const m = url.match(/^https?:\/\/[^/]+\/(?:npm\/)?(.+)$/);
   if (!m) return null;
   // Drop the @version from either a scoped (@scope/pkg@ver) or bare (pkg@ver) spec.
-  const rest = m[1].replace(/^(@[^/]+\/[^@/]+|[^@/]+)@[^/]+\//, '$1/');
+  // jsdelivr GitHub paths (gh/owner/repo@commit/...) map to the package
+  // installed from that repo, e.g. gh/johnfactotum/foliate-js@<sha>/mobi.js
+  // -> foliate-js/mobi.js.
+  const rest = m[1]
+    .replace(/^gh\/[^/]+\/([^@/]+)@[^/]+\//, '$1/')
+    .replace(/^(@[^/]+\/[^@/]+|[^@/]+)@[^/]+\//, '$1/');
   return path.join(NODE_MODULES, rest);
 }
 
